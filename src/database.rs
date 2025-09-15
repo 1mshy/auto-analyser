@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::models::{User, WatchlistItem, Alert, AlertTrigger, MarketData};
+use crate::models::{User, WatchlistItem, Alert, AlertTrigger, MarketData, Stock};
 use crate::utils::errors::AppResult;
 
 #[derive(Clone)]
@@ -216,15 +216,16 @@ impl Database {
     pub async fn store_market_data(&self, data: &MarketData) -> AppResult<()> {
         sqlx::query!(
             r#"
-            INSERT INTO market_data (id, symbol, timestamp, open, high, low, close, volume, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO market_data (id, symbol, timestamp, open, high, low, close, volume, created_at, last_updated)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (symbol, timestamp) DO UPDATE SET
                 open = EXCLUDED.open,
                 high = EXCLUDED.high,
                 low = EXCLUDED.low,
                 close = EXCLUDED.close,
                 volume = EXCLUDED.volume,
-                created_at = EXCLUDED.created_at
+                created_at = EXCLUDED.created_at,
+                last_updated = EXCLUDED.last_updated
             "#,
             data.id,
             data.symbol,
@@ -234,7 +235,8 @@ impl Database {
             data.low,
             data.close,
             data.volume,
-            data.created_at
+            data.created_at,
+            data.last_updated.unwrap_or_else(|| Utc::now())
         )
         .execute(&self.pool)
         .await?;
@@ -285,5 +287,93 @@ impl Database {
         .await?;
 
         Ok(symbols.into_iter().filter_map(|row| row.symbol).collect())
+    }
+
+    // Stock operations
+    pub async fn create_stock(
+        &self,
+        symbol: &str,
+        name: &str,
+        exchange: &str,
+        sector: Option<&str>,
+        industry: Option<&str>,
+        market_cap: Option<i64>,
+    ) -> AppResult<Stock> {
+        let stock = sqlx::query_as!(
+            Stock,
+            r#"
+            INSERT INTO stocks (id, symbol, name, exchange, sector, industry, market_cap, is_active, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $8)
+            ON CONFLICT (symbol) DO UPDATE SET
+                name = EXCLUDED.name,
+                exchange = EXCLUDED.exchange,
+                sector = EXCLUDED.sector,
+                industry = EXCLUDED.industry,
+                market_cap = EXCLUDED.market_cap,
+                updated_at = EXCLUDED.updated_at
+            RETURNING *
+            "#,
+            Uuid::new_v4(),
+            symbol,
+            name,
+            exchange,
+            sector,
+            industry,
+            market_cap,
+            Utc::now()
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(stock)
+    }
+
+    pub async fn get_all_active_stocks(&self, limit: Option<i64>, offset: Option<i64>) -> AppResult<Vec<Stock>> {
+        let limit = limit.unwrap_or(1000);
+        let offset = offset.unwrap_or(0);
+
+        let stocks = sqlx::query_as!(
+            Stock,
+            "SELECT * FROM stocks WHERE is_active = true ORDER BY symbol LIMIT $1 OFFSET $2",
+            limit,
+            offset
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(stocks)
+    }
+
+    pub async fn get_stocks_count(&self) -> AppResult<i64> {
+        let count = sqlx::query!(
+            "SELECT COUNT(*) as count FROM stocks WHERE is_active = true"
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(count.count.unwrap_or(0))
+    }
+
+    pub async fn get_all_stock_symbols(&self) -> AppResult<Vec<String>> {
+        let symbols = sqlx::query!(
+            "SELECT symbol FROM stocks WHERE is_active = true ORDER BY symbol"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(symbols.into_iter().map(|row| row.symbol).collect())
+    }
+
+    pub async fn update_stock_status(&self, symbol: &str, is_active: bool) -> AppResult<()> {
+        sqlx::query!(
+            "UPDATE stocks SET is_active = $1, updated_at = $2 WHERE symbol = $3",
+            is_active,
+            Utc::now(),
+            symbol
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 }

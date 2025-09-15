@@ -53,6 +53,7 @@ pub struct MarketData {
     pub close: Decimal,
     pub volume: i64,
     pub created_at: DateTime<Utc>,
+    pub last_updated: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -128,6 +129,34 @@ pub struct HistoricalDataResponse {
 pub struct IndicatorsResponse {
     pub symbol: String,
     pub indicators: TechnicalIndicators,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Stock {
+    pub id: Uuid,
+    pub symbol: String,
+    pub name: String,
+    pub exchange: String,
+    pub sector: Option<String>,
+    pub industry: Option<String>,
+    pub market_cap: Option<i64>,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StockListResponse {
+    pub total: i64,
+    pub stocks: Vec<Stock>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StockListQuery {
+    pub page: Option<i64>,
+    pub limit: Option<i64>,
+    pub sector: Option<String>,
+    pub exchange: Option<String>,
 }
 
 impl From<User> for UserResponse {

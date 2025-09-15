@@ -5,11 +5,13 @@ A comprehensive equity analysis service that ingests market data, computes techn
 ## Features
 
 - **Real-time Market Data**: Pulls quote and historical data from Yahoo Finance
+- **Comprehensive Stock Database**: Automatically fetches and maintains a database of all US stocks from NASDAQ and NYSE
 - **Technical Indicators**: Computes SMA, EMA, RSI, MACD, Bollinger Bands using the `ta` crate
 - **Alert System**: User-defined alert rules with automatic triggering
 - **Web UI**: Clean, modern interface for watchlists, alerts, and market signals
 - **REST API**: Full RESTful API for all operations
 - **Background Processing**: Automated market data updates and alert evaluation
+- **Scalable Data Collection**: Fetches market data for all known US stocks automatically
 
 ## Tech Stack
 
@@ -94,12 +96,17 @@ The application will be available at `http://localhost:3000`
 - `POST /api/alerts/{id}` - Update alert
 - `POST /api/alerts/{id}` - Delete alert
 
+### Stocks
+- `GET /api/stocks` - Get list of all known US stocks (paginated)
+- `POST /api/stocks/refresh` - Refresh the stock database from external sources
+
 ## Database Schema
 
 The application uses the following main tables:
 
 - `users` - User accounts
 - `watchlist` - User watchlists
+- `stocks` - Complete database of all US stocks with metadata
 - `alerts` - User-defined alert rules
 - `alert_triggers` - Alert trigger history
 - `market_data` - Historical market data cache

@@ -1,6 +1,29 @@
-# 🎉 Equity Analyser - Complete Full Stack Implementation
+# 🎉 Equity Analyser - Complete Implementation with All US Stocks
 
-## What I've Built
+## Latest Update: Complete US Stock Database Integration
+
+🚀 **NEW FEATURE**: The application now automatically fetches and maintains data for **ALL known US stocks** from NASDAQ and NYSE exchanges, not just watchlist items!
+
+## What's New in This Update
+
+### ✅ Comprehensive Stock Database
+- **Complete US Stock Coverage**: Automatically fetches all stocks from NASDAQ and NYSE
+- **Rich Metadata**: Includes company names, sectors, industries, market cap data
+- **Daily Updates**: Stock list refreshes automatically every 24 hours
+- **Fallback Support**: Includes hardcoded major stocks list for reliability
+
+### ✅ Enhanced Market Data Collection
+- **All-Stock Data Fetching**: Now collects market data for ALL US stocks, not just watchlist items
+- **Batch Processing**: Efficiently processes thousands of stocks with rate limiting
+- **Smart Scheduling**: Configurable intervals with intelligent error handling
+- **Scalable Architecture**: Designed to handle large volumes of stocks
+
+### ✅ New API Endpoints
+- `GET /api/stocks` - List all known US stocks with pagination and filtering
+- `POST /api/stocks/refresh` - Manually refresh the stock database
+- Query parameters: `page`, `limit`, `sector`, `exchange` for flexible filtering
+
+## What I've Built (Updated)
 
 A complete, production-ready equity analysis service with both backend and frontend components:
 

@@ -61,6 +61,7 @@ impl MarketDataService {
                 close: Decimal::from_f64_retain(quote.close).unwrap_or_default(),
                 volume: quote.volume as i64,
                 created_at: Utc::now(),
+                last_updated: Some(Utc::now()),
             })
             .collect();
 

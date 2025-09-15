@@ -20,7 +20,7 @@ use tracing_subscriber;
 
 use crate::config::Config;
 use crate::database::Database;
-use crate::handlers::{auth, market_data, alerts, watchlist};
+use crate::handlers::{auth, market_data, alerts, watchlist, stocks};
 use crate::utils::auth::auth_middleware;
 
 #[tokio::main]
@@ -48,6 +48,7 @@ async fn main() -> Result<()> {
         .route("/api/market/quote/:symbol", get(market_data::get_quote))
         .route("/api/market/historical/:symbol", get(market_data::get_historical))
         .route("/api/market/indicators/:symbol", get(market_data::get_indicators))
+        .route("/api/stocks/refresh", post(stocks::refresh_stock_list))
         .route("/api/watchlist", get(watchlist::get_watchlist))
         .route("/api/watchlist", post(watchlist::add_to_watchlist))
         .route("/api/watchlist/:symbol", delete(watchlist::remove_from_watchlist))
@@ -61,6 +62,9 @@ async fn main() -> Result<()> {
         // Public auth routes
         .route("/api/auth/register", post(auth::register))
         .route("/api/auth/login", post(auth::login))
+        
+        // Public stock discovery routes  
+        .route("/api/stocks", get(stocks::list_stocks))
         
         // Protected routes
         .merge(protected_routes)
@@ -81,6 +85,12 @@ async fn main() -> Result<()> {
     let scheduler_state = api::AppState::new(config.clone(), Database::new(&config.database_url).await?);
     tokio::spawn(async move {
         services::scheduler::start_market_data_scheduler(scheduler_state).await;
+    });
+
+    // Start the stock list scheduler
+    let stock_scheduler_state = api::AppState::new(config.clone(), Database::new(&config.database_url).await?);
+    tokio::spawn(async move {
+        services::scheduler::start_stock_list_scheduler(stock_scheduler_state).await;
     });
 
     // Start the alert evaluator
