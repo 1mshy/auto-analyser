@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Equity Analyser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .auth-section {
+            display: flex;
+            gap: 10px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .quote-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .symbol {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .price {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .positive {
+            color: #28a745;
+        }
+
+        .negative {
+            color: #dc3545;
+        }
+
+        .alert-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .auth-forms {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+        }
+
+        .notification.error {
+            background: #dc3545;
+        }
+
+        @media (max-width: 768px) {
+            .auth-forms {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">📈 Equity Analyser</div>
+            <div class="auth-section">
+                <div id="logged-out" class="hidden">
+                    <button class="btn" onclick="showAuth()">Sign In / Register</button>
+                </div>
+                <div id="logged-in" class="hidden">
+                    <span id="user-email"></span>
+                    <button class="btn btn-secondary" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="auth-container" class="card">
+            <h2>Authentication</h2>
+            <div class="auth-forms">
+                <div>
+                    <h3>Sign In</h3>
+                    <form id="login-form">
+                        <div class="input-group">
+                            <label for="login-email">Email</label>
+                            <input type="email" id="login-email" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="login-password">Password</label>
+                            <input type="password" id="login-password" required>
+                        </div>
+                        <button type="submit" class="btn">Sign In</button>
+                    </form>
+                </div>
+                <div>
+                    <h3>Register</h3>
+                    <form id="register-form">
+                        <div class="input-group">
+                            <label for="register-email">Email</label>
+                            <input type="email" id="register-email" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="register-password">Password</label>
+                            <input type="password" id="register-password" required>
+                        </div>
+                        <button type="submit" class="btn">Register</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="dashboard" class="hidden">
+            <div class="grid">
+                <div class="card">
+                    <h2>Add to Watchlist</h2>
+                    <form id="add-symbol-form">
+                        <div class="input-group">
+                            <label for="symbol-input">Stock Symbol</label>
+                            <input type="text" id="symbol-input" placeholder="e.g., AAPL, GOOGL" required>
+                        </div>
+                        <button type="submit" class="btn">Add Symbol</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Create Alert</h2>
+                    <form id="create-alert-form">
+                        <div class="input-group">
+                            <label for="alert-symbol">Symbol</label>
+                            <input type="text" id="alert-symbol" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="alert-condition">Condition</label>
+                            <select id="alert-condition" style="width: 100%; padding: 12px; border: 2px solid #e1e5e9; border-radius: 8px;">
+                                <option value="price_above">Price Above</option>
+                                <option value="price_below">Price Below</option>
+                                <option value="rsi_above">RSI Above</option>
+                                <option value="rsi_below">RSI Below</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="alert-value">Value</label>
+                            <input type="number" id="alert-value" step="0.01" required>
+                        </div>
+                        <button type="submit" class="btn">Create Alert</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <h2>Watchlist</h2>
+                    <div id="watchlist-container">
+                        <p>Loading...</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Active Alerts</h2>
+                    <div id="alerts-container">
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = localStorage.getItem('authToken');
+        
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            if (authToken) {
+                showDashboard();
+                loadDashboardData();
+            } else {
+                showAuth();
+            }
+        });
+
+        // Authentication functions
+        function showAuth() {
+            document.getElementById('auth-container').classList.remove('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('logged-out').classList.remove('hidden');
+            document.getElementById('logged-in').classList.add('hidden');
+        }
+
+        function showDashboard() {
+            document.getElementById('auth-container').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            document.getElementById('logged-out').classList.add('hidden');
+            document.getElementById('logged-in').classList.remove('hidden');
+        }
+
+        function logout() {
+            localStorage.removeItem('authToken');
+            authToken = null;
+            showAuth();
+        }
+
+        // API functions
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            };
+
+            if (authToken) {
+                options.headers['Authorization'] = `Bearer ${authToken}`;
+            }
+
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+
+            const response = await fetch(`http://localhost:3000/api${endpoint}`, options);
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'API request failed');
+            }
+
+            return response.json();
+        }
+
+        function showNotification(message, isError = false) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${isError ? 'error' : ''}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Form handlers
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            try {
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+                
+                const response = await apiCall('/auth/login', 'POST', { email, password });
+                
+                authToken = response.token;
+                localStorage.setItem('authToken', authToken);
+                
+                showDashboard();
+                loadDashboardData();
+                showNotification('Login successful!');
+            } catch (error) {
+                showNotification(error.message, true);
+            }
+        });
+
+        document.getElementById('register-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            try {
+                const email = document.getElementById('register-email').value;
+                const password = document.getElementById('register-password').value;
+                
+                const response = await apiCall('/auth/register', 'POST', { email, password });
+                
+                authToken = response.token;
+                localStorage.setItem('authToken', authToken);
+                
+                showDashboard();
+                loadDashboardData();
+                showNotification('Registration successful!');
+            } catch (error) {
+                showNotification(error.message, true);
+            }
+        });
+
+        document.getElementById('add-symbol-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            try {
+                const symbol = document.getElementById('symbol-input').value.toUpperCase();
+                
+                await apiCall('/watchlist', 'POST', { symbol });
+                
+                document.getElementById('symbol-input').value = '';
+                loadWatchlist();
+                showNotification('Symbol added to watchlist!');
+            } catch (error) {
+                showNotification(error.message, true);
+            }
+        });
+
+        document.getElementById('create-alert-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            try {
+                const symbol = document.getElementById('alert-symbol').value.toUpperCase();
+                const condition_type = document.getElementById('alert-condition').value;
+                const condition_value = parseFloat(document.getElementById('alert-value').value);
+                
+                await apiCall('/alerts', 'POST', { symbol, condition_type, condition_value });
+                
+                document.getElementById('create-alert-form').reset();
+                loadAlerts();
+                showNotification('Alert created!');
+            } catch (error) {
+                showNotification(error.message, true);
+            }
+        });
+
+        // Dashboard data loading
+        async function loadDashboardData() {
+            await Promise.all([loadWatchlist(), loadAlerts()]);
+        }
+
+        async function loadWatchlist() {
+            try {
+                const watchlist = await apiCall('/watchlist');
+                const container = document.getElementById('watchlist-container');
+                
+                if (watchlist.length === 0) {
+                    container.innerHTML = '<p>No symbols in watchlist.</p>';
+                    return;
+                }
+
+                container.innerHTML = watchlist.map(item => `
+                    <div class="quote-item">
+                        <div>
+                            <span class="symbol">${item.symbol}</span>
+                        </div>
+                        <button class="btn btn-secondary" onclick="removeFromWatchlist('${item.symbol}')">Remove</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('watchlist-container').innerHTML = '<p>Error loading watchlist.</p>';
+            }
+        }
+
+        async function loadAlerts() {
+            try {
+                const alerts = await apiCall('/alerts');
+                const container = document.getElementById('alerts-container');
+                
+                if (alerts.length === 0) {
+                    container.innerHTML = '<p>No active alerts.</p>';
+                    return;
+                }
+
+                container.innerHTML = alerts.map(alert => `
+                    <div class="alert-item">
+                        <div>
+                            <strong>${alert.symbol}</strong> ${alert.condition_type} ${alert.condition_value}
+                            <br><small>Created: ${new Date(alert.created_at).toLocaleDateString()}</small>
+                        </div>
+                        <button class="btn btn-secondary" onclick="deleteAlert('${alert.id}')">Delete</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('alerts-container').innerHTML = '<p>Error loading alerts.</p>';
+            }
+        }
+
+        async function removeFromWatchlist(symbol) {
+            try {
+                await apiCall(`/watchlist/${symbol}`, 'DELETE');
+                loadWatchlist();
+                showNotification('Symbol removed from watchlist!');
+            } catch (error) {
+                showNotification(error.message, true);
+            }
+        }
+
+        async function deleteAlert(alertId) {
+            try {
+                await apiCall(`/alerts/${alertId}`, 'DELETE');
+                loadAlerts();
+                showNotification('Alert deleted!');
+            } catch (error) {
+                showNotification(error.message, true);
+            }
+        }
+    </script>
+</body>
+</html>
