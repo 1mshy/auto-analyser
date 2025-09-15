@@ -1,0 +1,1 @@
+This auto analyser will run analysis 24/7 on equities. It will be customizable in the frequency and selection of equities. Should also be able to set flags from outside the program for indicators.
