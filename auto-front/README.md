@@ -24,7 +24,7 @@ A modern React application built with Vite, HeroUI, and Tailwind CSS that provid
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm or yarn
 - Running Equity Analyser backend (Rust service on port 3000)
 
@@ -61,21 +61,25 @@ src/
 ## Key Features
 
 ### Authentication Flow
+
 - User registration and login with JWT tokens
 - Automatic token persistence and validation
 - Protected routes based on authentication state
 
 ### Market Data
+
 - Real-time stock quotes with current price and change percentage
 - Technical indicators including SMA, EMA, RSI, MACD, and Bollinger Bands
 - Search functionality for any stock symbol
 
 ### Watchlist Management
+
 - Add/remove stocks from personal watchlist
 - Real-time price updates for all watched symbols
 - Quick overview of portfolio performance
 
 ### Alert System
+
 - Price-based alerts (above/below thresholds)
 - Technical indicator alerts (RSI overbought/oversold)
 - Enable/disable alerts with toggle switches
@@ -84,6 +88,7 @@ src/
 ## API Integration
 
 Connects to the Rust backend API at `http://localhost:3000` with endpoints for:
+
 - Authentication (`/api/auth/*`)
 - Market data (`/api/market/*`)
 - Watchlist management (`/api/watchlist`)

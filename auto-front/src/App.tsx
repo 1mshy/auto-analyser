@@ -1,9 +1,9 @@
-import React from "react";
-import { BrowserRouter } from "react-router-dom";
+import React from 'react';
+import { BrowserRouter } from 'react-router-dom';
 
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { AuthPage } from "@/components/auth/AuthPage";
-import { Dashboard } from "@/components/Dashboard";
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { AuthPage } from '@/components/auth/AuthPage';
+import { Dashboard } from '@/components/Dashboard';
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, loading } = useAuth();

@@ -1,31 +1,33 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardBody, CardHeader } from "@heroui/card";
-import { Button } from "@heroui/button";
-import { Input } from "@heroui/input";
+import React, { useState, useEffect } from 'react';
+import { Card, CardBody, CardHeader } from '@heroui/card';
+import { Button } from '@heroui/button';
+import { Input } from '@heroui/input';
 
-import { apiService, Quote, TechnicalIndicators } from "@/services/api";
+import { apiService, Quote, TechnicalIndicators } from '@/services/api';
 
 export const StockQuote: React.FC = () => {
-  const [symbol, setSymbol] = useState("AAPL");
+  const [symbol, setSymbol] = useState('AAPL');
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [indicators, setIndicators] = useState<TechnicalIndicators | null>(null);
+  const [indicators, setIndicators] = useState<TechnicalIndicators | null>(
+    null
+  );
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   const fetchStockData = async (stockSymbol: string) => {
     setLoading(true);
-    setError("");
-    
+    setError('');
+
     try {
       const [quoteData, indicatorData] = await Promise.all([
         apiService.getQuote(stockSymbol),
-        apiService.getTechnicalIndicators(stockSymbol)
+        apiService.getTechnicalIndicators(stockSymbol),
       ]);
-      
+
       setQuote(quoteData);
       setIndicators(indicatorData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch data");
+      setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
       setLoading(false);
     }
@@ -42,14 +44,14 @@ export const StockQuote: React.FC = () => {
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
     }).format(value);
   };
 
   const formatPercent = (value: number) => {
-    return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
+    return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
   };
 
   return (
@@ -61,22 +63,16 @@ export const StockQuote: React.FC = () => {
             value={symbol}
             className="flex-1"
             onChange={(e) => setSymbol(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
           />
-          <Button
-            color="primary"
-            isLoading={loading}
-            onPress={handleSearch}
-          >
+          <Button color="primary" isLoading={loading} onPress={handleSearch}>
             Search
           </Button>
         </div>
       </CardHeader>
       <CardBody>
-        {error && (
-          <div className="text-red-500 text-center mb-4">{error}</div>
-        )}
-        
+        {error && <div className="text-red-500 text-center mb-4">{error}</div>}
+
         {quote && (
           <div className="space-y-6">
             {/* Price Information */}
@@ -86,8 +82,11 @@ export const StockQuote: React.FC = () => {
                 <div className="text-3xl font-bold">
                   {formatCurrency(quote.price)}
                 </div>
-                <div className={`text-lg ${quote.change >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {formatCurrency(quote.change)} ({formatPercent(quote.change_percent)})
+                <div
+                  className={`text-lg ${quote.change >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                >
+                  {formatCurrency(quote.change)} (
+                  {formatPercent(quote.change_percent)})
                 </div>
               </div>
               <div className="space-y-2">
@@ -104,27 +103,38 @@ export const StockQuote: React.FC = () => {
             {/* Technical Indicators */}
             {indicators && (
               <div className="border-t pt-4">
-                <h4 className="text-lg font-semibold mb-4">Technical Indicators</h4>
+                <h4 className="text-lg font-semibold mb-4">
+                  Technical Indicators
+                </h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {indicators.sma_20 && (
                     <div className="text-center p-3 bg-gray-50 rounded">
                       <div className="text-sm text-gray-600">SMA 20</div>
-                      <div className="font-semibold">{formatCurrency(indicators.sma_20)}</div>
+                      <div className="font-semibold">
+                        {formatCurrency(indicators.sma_20)}
+                      </div>
                     </div>
                   )}
                   {indicators.sma_50 && (
                     <div className="text-center p-3 bg-gray-50 rounded">
                       <div className="text-sm text-gray-600">SMA 50</div>
-                      <div className="font-semibold">{formatCurrency(indicators.sma_50)}</div>
+                      <div className="font-semibold">
+                        {formatCurrency(indicators.sma_50)}
+                      </div>
                     </div>
                   )}
                   {indicators.rsi_14 && (
                     <div className="text-center p-3 bg-gray-50 rounded">
                       <div className="text-sm text-gray-600">RSI 14</div>
-                      <div className={`font-semibold ${
-                        indicators.rsi_14 > 70 ? "text-red-600" : 
-                        indicators.rsi_14 < 30 ? "text-green-600" : "text-gray-900"
-                      }`}>
+                      <div
+                        className={`font-semibold ${
+                          indicators.rsi_14 > 70
+                            ? 'text-red-600'
+                            : indicators.rsi_14 < 30
+                              ? 'text-green-600'
+                              : 'text-gray-900'
+                        }`}
+                      >
                         {indicators.rsi_14.toFixed(2)}
                       </div>
                     </div>
@@ -132,7 +142,9 @@ export const StockQuote: React.FC = () => {
                   {indicators.macd && (
                     <div className="text-center p-3 bg-gray-50 rounded">
                       <div className="text-sm text-gray-600">MACD</div>
-                      <div className="font-semibold">{indicators.macd.toFixed(4)}</div>
+                      <div className="font-semibold">
+                        {indicators.macd.toFixed(4)}
+                      </div>
                     </div>
                   )}
                 </div>

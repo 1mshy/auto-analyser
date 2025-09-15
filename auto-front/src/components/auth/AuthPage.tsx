@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 
-import { LoginForm } from "@/components/auth/LoginForm";
-import { RegisterForm } from "@/components/auth/RegisterForm";
+import { LoginForm } from '@/components/auth/LoginForm';
+import { RegisterForm } from '@/components/auth/RegisterForm';
 
 export const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -17,7 +17,7 @@ export const AuthPage: React.FC = () => {
             Professional stock analysis and monitoring platform
           </p>
         </div>
-        
+
         {isLogin ? (
           <LoginForm onSwitchToRegister={() => setIsLogin(false)} />
         ) : (

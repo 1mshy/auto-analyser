@@ -1,6 +1,17 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react';
 
-import { apiService, User, LoginRequest, RegisterRequest } from "@/services/api";
+import {
+  apiService,
+  User,
+  LoginRequest,
+  RegisterRequest,
+} from '@/services/api';
 
 interface AuthContextType {
   user: User | null;

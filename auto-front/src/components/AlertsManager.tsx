@@ -1,21 +1,20 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardBody, CardHeader } from "@heroui/card";
-import { Button } from "@heroui/button";
-import { Input } from "@heroui/input";
-import { Select, SelectItem } from "@heroui/select";
-import { Switch } from "@heroui/switch";
+import React, { useState, useEffect } from 'react';
+import { Card, CardBody, CardHeader } from '@heroui/card';
+import { Button } from '@heroui/button';
+import { Input } from '@heroui/input';
+import { Select, SelectItem } from '@heroui/select';
 
-import { apiService, Alert, CreateAlertRequest } from "@/services/api";
+import { apiService, Alert, CreateAlertRequest } from '@/services/api';
 
 export const AlertsManager: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  
+
   // Form state
   const [newAlert, setNewAlert] = useState<CreateAlertRequest>({
-    symbol: "",
-    alert_type: "price_above",
+    symbol: '',
+    alert_type: 'price_above',
     threshold: 0,
   });
 
@@ -25,7 +24,7 @@ export const AlertsManager: React.FC = () => {
       const alertsData = await apiService.getAlerts();
       setAlerts(alertsData);
     } catch (error) {
-      console.error("Failed to load alerts:", error);
+      console.error('Failed to load alerts:', error);
     } finally {
       setLoading(false);
     }
@@ -43,11 +42,11 @@ export const AlertsManager: React.FC = () => {
         ...newAlert,
         symbol: newAlert.symbol.toUpperCase(),
       });
-      setNewAlert({ symbol: "", alert_type: "price_above", threshold: 0 });
+      setNewAlert({ symbol: '', alert_type: 'price_above', threshold: 0 });
       setShowCreateForm(false);
       await loadAlerts();
     } catch (error) {
-      console.error("Failed to create alert:", error);
+      console.error('Failed to create alert:', error);
     }
   };
 
@@ -56,7 +55,7 @@ export const AlertsManager: React.FC = () => {
       await apiService.deleteAlert(id);
       await loadAlerts();
     } catch (error) {
-      console.error("Failed to delete alert:", error);
+      console.error('Failed to delete alert:', error);
     }
   };
 
@@ -67,15 +66,15 @@ export const AlertsManager: React.FC = () => {
       });
       await loadAlerts();
     } catch (error) {
-      console.error("Failed to update alert:", error);
+      console.error('Failed to update alert:', error);
     }
   };
 
   const alertTypeLabels = {
-    price_above: "Price Above",
-    price_below: "Price Below", 
-    rsi_overbought: "RSI Overbought (>70)",
-    rsi_oversold: "RSI Oversold (<30)",
+    price_above: 'Price Above',
+    price_below: 'Price Below',
+    rsi_overbought: 'RSI Overbought (>70)',
+    rsi_oversold: 'RSI Oversold (<30)',
   };
 
   return (
@@ -87,7 +86,7 @@ export const AlertsManager: React.FC = () => {
             color="primary"
             onPress={() => setShowCreateForm(!showCreateForm)}
           >
-            {showCreateForm ? "Cancel" : "Create Alert"}
+            {showCreateForm ? 'Cancel' : 'Create Alert'}
           </Button>
         </div>
       </CardHeader>
@@ -111,7 +110,7 @@ export const AlertsManager: React.FC = () => {
                   const selectedKey = Array.from(keys)[0] as string;
                   setNewAlert({
                     ...newAlert,
-                    alert_type: selectedKey as CreateAlertRequest["alert_type"],
+                    alert_type: selectedKey as CreateAlertRequest['alert_type'],
                   });
                 }}
               >
@@ -133,11 +132,7 @@ export const AlertsManager: React.FC = () => {
                   })
                 }
               />
-              <Button
-                color="primary"
-                className="mt-6"
-                onPress={createAlert}
-              >
+              <Button color="primary" className="mt-6" onPress={createAlert}>
                 Create
               </Button>
             </div>
@@ -148,7 +143,8 @@ export const AlertsManager: React.FC = () => {
           <div className="text-center py-8">Loading alerts...</div>
         ) : alerts.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
-            No alerts configured. Create one to get notified about price changes!
+            No alerts configured. Create one to get notified about price
+            changes!
           </div>
         ) : (
           <div className="space-y-3">
@@ -164,10 +160,9 @@ export const AlertsManager: React.FC = () => {
                       {alertTypeLabels[alert.alert_type]}
                     </div>
                     <div className="font-semibold">
-                      {alert.alert_type.includes("price") 
+                      {alert.alert_type.includes('price')
                         ? `$${alert.threshold}`
-                        : alert.threshold
-                      }
+                        : alert.threshold}
                     </div>
                   </div>
                   <div className="text-xs text-gray-500 mt-1">

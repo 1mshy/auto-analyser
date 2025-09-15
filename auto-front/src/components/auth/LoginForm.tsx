@@ -1,9 +1,9 @@
-import React, { useState } from "react";
-import { Button } from "@heroui/button";
-import { Input } from "@heroui/input";
-import { Card, CardBody, CardHeader } from "@heroui/card";
+import React, { useState } from 'react';
+import { Button } from '@heroui/button';
+import { Input } from '@heroui/input';
+import { Card, CardBody, CardHeader } from '@heroui/card';
 
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from '@/contexts/AuthContext';
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
@@ -37,40 +37,40 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
         <h2 className="text-2xl font-bold text-center">Login</h2>
       </CardHeader>
       <CardBody>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form className="space-y-4" onSubmit={handleSubmit}>
           <Input
-            type="email"
+            fullWidth
+            required
             label="Email"
+            type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            required
-            fullWidth
           />
           <Input
-            type="password"
+            fullWidth
+            required
             label="Password"
+            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            required
-            fullWidth
           />
           {error && (
             <div className="text-red-500 text-sm text-center">{error}</div>
           )}
           <Button
-            type="submit"
-            color="primary"
             fullWidth
-            isLoading={loading}
+            color="primary"
             disabled={loading}
+            isLoading={loading}
+            type="submit"
           >
             Login
           </Button>
           <div className="text-center">
             <Button
+              className="text-sm"
               variant="light"
               onPress={onSwitchToRegister}
-              className="text-sm"
             >
               Don't have an account? Register
             </Button>

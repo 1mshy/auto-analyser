@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardBody, CardHeader } from "@heroui/card";
-import { Button } from "@heroui/button";
-import { Input } from "@heroui/input";
+import React, { useState, useEffect } from 'react';
+import { Card, CardBody, CardHeader } from '@heroui/card';
+import { Button } from '@heroui/button';
+import { Input } from '@heroui/input';
 
-import { apiService, WatchlistItem, Quote } from "@/services/api";
+import { apiService, WatchlistItem, Quote } from '@/services/api';
 
 export const Watchlist: React.FC = () => {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
-  const [newSymbol, setNewSymbol] = useState("");
+  const [newSymbol, setNewSymbol] = useState('');
   const [loading, setLoading] = useState(false);
   const [addingSymbol, setAddingSymbol] = useState(false);
 
@@ -17,7 +17,7 @@ export const Watchlist: React.FC = () => {
     try {
       const watchlistData = await apiService.getWatchlist();
       setWatchlist(watchlistData);
-      
+
       // Fetch quotes for all symbols
       const quotesData: Record<string, Quote> = {};
       await Promise.all(
@@ -32,7 +32,7 @@ export const Watchlist: React.FC = () => {
       );
       setQuotes(quotesData);
     } catch (error) {
-      console.error("Failed to load watchlist:", error);
+      console.error('Failed to load watchlist:', error);
     } finally {
       setLoading(false);
     }
@@ -44,14 +44,14 @@ export const Watchlist: React.FC = () => {
 
   const addSymbol = async () => {
     if (!newSymbol.trim()) return;
-    
+
     setAddingSymbol(true);
     try {
       await apiService.addToWatchlist(newSymbol.toUpperCase());
-      setNewSymbol("");
+      setNewSymbol('');
       await loadWatchlist(); // Reload the watchlist
     } catch (error) {
-      console.error("Failed to add symbol:", error);
+      console.error('Failed to add symbol:', error);
     } finally {
       setAddingSymbol(false);
     }
@@ -62,19 +62,19 @@ export const Watchlist: React.FC = () => {
       await apiService.removeFromWatchlist(symbol);
       await loadWatchlist(); // Reload the watchlist
     } catch (error) {
-      console.error("Failed to remove symbol:", error);
+      console.error('Failed to remove symbol:', error);
     }
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
     }).format(value);
   };
 
   const formatPercent = (value: number) => {
-    return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
+    return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
   };
 
   return (
@@ -88,7 +88,7 @@ export const Watchlist: React.FC = () => {
               value={newSymbol}
               className="w-32"
               onChange={(e) => setNewSymbol(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && addSymbol()}
+              onKeyPress={(e) => e.key === 'Enter' && addSymbol()}
             />
             <Button
               color="primary"
@@ -126,7 +126,9 @@ export const Watchlist: React.FC = () => {
                         </div>
                         <div
                           className={`text-sm ${
-                            quote.change >= 0 ? "text-green-600" : "text-red-600"
+                            quote.change >= 0
+                              ? 'text-green-600'
+                              : 'text-red-600'
                           }`}
                         >
                           {formatCurrency(quote.change)} (
