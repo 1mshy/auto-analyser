@@ -1,6 +1,24 @@
 [package]
 name = "auto-analyser"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+description = "A Rust library for stock market analysis using Yahoo Finance API and technical indicators"
+license = "MIT"
+repository = "https://github.com/yourusername/auto-analyser"
+
+[[bin]]
+name = "auto-analyser"
+path = "src/main.rs"
+
+[lib]
+name = "auto_analyser"
+path = "src/lib.rs"
 
 [dependencies]
+yahoo_finance_api = "2.3"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+time = { version = "0.3", features = ["parsing", "formatting", "macros"] }
+anyhow = "1.0"
+ta = "0.5"  # Technical analysis library
