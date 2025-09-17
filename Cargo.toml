@@ -1,66 +1,6 @@
 [package]
 name = "auto-analyser"
 version = "0.1.0"
-edition = "2021"
-
-[[bin]]
-name = "auto-analyser"
-path = "src/main.rs"
-
-[[bin]]
-name = "simple_test"
-path = "src/simple_test.rs"
+edition = "2024"
 
 [dependencies]
-# Web framework
-axum = "0.7"
-tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "fs"] }
-
-# Async runtime
-tokio = { version = "1.0", features = ["full"] }
-
-# Database
-sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "postgres", "uuid", "json", "chrono", "decimal"] }
-
-# Decimal support
-rust_decimal = { version = "1.0", features = ["serde"] }
-
-# Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-
-# Time handling
-chrono = { version = "0.4", features = ["serde"] }
-
-# Technical analysis
-ta = "0.5"
-
-# Market data
-yahoo_finance_api = "4.1.0"
-
-# Configuration
-config = "0.14"
-
-# Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-# Error handling
-anyhow = "1.0"
-thiserror = "1.0"
-
-# UUID generation
-uuid = { version = "1.0", features = ["v4", "serde"] }
-
-# Password hashing
-bcrypt = "0.15"
-
-# JWT tokens
-jsonwebtoken = "9.0"
-
-# HTTP client
-reqwest = { version = "0.11", features = ["json"] }
-
-# Environment variables
-dotenv = "0.15"
