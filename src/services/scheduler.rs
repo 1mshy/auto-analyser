@@ -49,24 +49,35 @@ pub async fn start_stock_list_scheduler(state: Arc<AppState>) {
 }
 
 async fn update_market_data(state: &Arc<AppState>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Get all stock symbols instead of just watchlist/alert symbols
+    // Get all active stock symbols, filtering out delisted ones and symbols with "^"
     let symbols = state.db.get_all_stock_symbols().await?;
     
-    if symbols.is_empty() {
-        warn!("No stocks found in database. Updating stock list first...");
+    // Filter symbols to exclude ones that should be ignored
+    let filtered_symbols: Vec<String> = symbols
+        .into_iter()
+        .filter(|symbol| !StockListService::should_ignore_symbol(symbol))
+        .collect();
+    
+    if filtered_symbols.is_empty() {
+        warn!("No active stocks found in database. Updating stock list first...");
         if let Err(e) = update_stock_list(state).await {
             error!("Failed to update stock list: {}", e);
             return Ok(());
         }
         // Try again after stock list update
         let symbols = state.db.get_all_stock_symbols().await?;
-        if symbols.is_empty() {
-            warn!("Still no stocks found after update");
+        let filtered_symbols: Vec<String> = symbols
+            .into_iter()
+            .filter(|symbol| !StockListService::should_ignore_symbol(symbol))
+            .collect();
+            
+        if filtered_symbols.is_empty() {
+            warn!("Still no active stocks found after update");
             return Ok(());
         }
     }
 
-    info!("Updating market data for {} symbols", symbols.len());
+    info!("Updating market data for {} active symbols", filtered_symbols.len());
 
     let market_service = MarketDataService::new();
     let mut successful_updates = 0;
@@ -74,9 +85,9 @@ async fn update_market_data(state: &Arc<AppState>) -> Result<(), Box<dyn std::er
 
     // Process stocks in batches to avoid overwhelming the API
     const BATCH_SIZE: usize = 50;
-    for batch in symbols.chunks(BATCH_SIZE) {
+    for batch in filtered_symbols.chunks(BATCH_SIZE) {
         for symbol in batch {
-            match market_service.fetch_historical_data(symbol, "1d").await {
+            match market_service.fetch_historical_data_with_delisting_check(symbol, state.db.pool()).await {
                 Ok(data) => {
                     for market_data in data {
                         if let Err(e) = state.db.store_market_data(&market_data).await {
@@ -144,8 +155,8 @@ async fn update_stock_list(state: &Arc<AppState>) -> Result<(), Box<dyn std::err
     for stock in stocks {
         match state.db.create_stock(
             &stock.symbol,
-            &stock.name,
-            &stock.exchange,
+            Some(&stock.name),
+            Some(&stock.exchange),
             stock.sector.as_deref(),
             stock.industry.as_deref(),
             stock.market_cap,

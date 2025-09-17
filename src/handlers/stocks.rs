@@ -67,8 +67,8 @@ pub async fn refresh_stock_list(
     for stock in stocks {
         match state.db.create_stock(
             &stock.symbol,
-            &stock.name,
-            &stock.exchange,
+            Some(&stock.name),
+            Some(&stock.exchange),
             stock.sector.as_deref(),
             stock.industry.as_deref(),
             stock.market_cap,

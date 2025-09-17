@@ -1,9 +1,9 @@
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use sqlx::Row;
 use std::collections::HashSet;
 use tracing::{info, error, warn};
 
-use crate::models::Stock;
 use crate::utils::errors::{AppError, AppResult};
 
 #[derive(Debug, Deserialize)]
@@ -57,6 +57,65 @@ impl StockListService {
         }
     }
 
+    /// Check if a symbol should be ignored based on certain criteria
+    pub fn should_ignore_symbol(symbol: &str) -> bool {
+        // Ignore symbols with "^" as they are typically indices or special symbols
+        if symbol.contains('^') || symbol.contains('/') || symbol.contains('*') {
+            return true;
+        }
+        
+        // Ignore empty symbols
+        if symbol.trim().is_empty() {
+            return true;
+        }
+        
+        // Additional filters can be added here
+        false
+    }
+
+    /// Mark a stock as inactive (delisted) in the database
+    pub async fn mark_stock_as_delisted(&self, symbol: &str, db_pool: &sqlx::PgPool) -> AppResult<()> {
+        self.mark_stock_as_delisted_with_reason(symbol, "no_data_found", "No data found, symbol may be delisted", db_pool).await
+    }
+
+    /// Mark a stock as inactive (delisted) with a specific reason
+    pub async fn mark_stock_as_delisted_with_reason(&self, symbol: &str, reason: &str, error_message: &str, db_pool: &sqlx::PgPool) -> AppResult<()> {
+        let result = sqlx::query(
+            r#"
+            UPDATE stocks 
+            SET is_active = false, 
+                delisting_reason = $2, 
+                last_error_at = NOW(), 
+                last_error_message = $3, 
+                updated_at = NOW() 
+            WHERE symbol = $1
+            "#
+        )
+        .bind(symbol)
+        .bind(reason)
+        .bind(error_message)
+        .execute(db_pool)
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to mark stock as delisted: {}", e)))?;
+
+        if result.rows_affected() > 0 {
+            warn!("Marked stock {} as delisted with reason: {}", symbol, reason);
+        }
+
+        Ok(())
+    }
+
+    /// Check if a stock is marked as delisted in the database
+    pub async fn is_stock_delisted(&self, symbol: &str, db_pool: &sqlx::PgPool) -> AppResult<bool> {
+        let result = sqlx::query("SELECT is_active FROM stocks WHERE symbol = $1")
+            .bind(symbol)
+            .fetch_optional(db_pool)
+            .await
+            .map_err(|e| AppError::InternalServerError(format!("Failed to check stock status: {}", e)))?;
+
+        Ok(result.map(|row| !row.get::<bool, _>("is_active")).unwrap_or(false))
+    }
+
     /// Fetch all US stocks from multiple exchanges
     pub async fn fetch_all_us_stocks(&self) -> AppResult<Vec<StockInfo>> {
         let mut all_stocks = Vec::new();
@@ -78,7 +137,7 @@ impl StockListService {
 
         // Fetch from NYSE
         match self.fetch_nyse_stocks().await {
-            Ok(mut nyse_stocks) => {
+            Ok(nyse_stocks) => {
                 let mut unique_nyse = Vec::new();
                 for stock in nyse_stocks {
                     if !seen_symbols.contains(&stock.symbol) {
@@ -123,7 +182,7 @@ impl StockListService {
             .rows
             .into_iter()
             .filter_map(|stock| {
-                if stock.symbol.is_empty() || stock.name.is_empty() {
+                if StockListService::should_ignore_symbol(&stock.symbol) {
                     return None;
                 }
 
@@ -169,7 +228,7 @@ impl StockListService {
             .rows
             .into_iter()
             .filter_map(|stock| {
-                if stock.symbol.is_empty() || stock.name.is_empty() {
+                if StockListService::should_ignore_symbol(&stock.symbol) {
                     return None;
                 }
 
@@ -220,5 +279,37 @@ impl StockListService {
             StockInfo { symbol: "XOM".to_string(), name: "Exxon Mobil Corporation".to_string(), exchange: "NYSE".to_string(), sector: Some("Energy".to_string()), industry: Some("Oil & Gas Integrated".to_string()), market_cap: None },
             StockInfo { symbol: "CVX".to_string(), name: "Chevron Corporation".to_string(), exchange: "NYSE".to_string(), sector: Some("Energy".to_string()), industry: Some("Oil & Gas Integrated".to_string()), market_cap: None },
         ]
+    }
+
+    /// Get symbols to update, excluding delisted ones and symbols with "^"
+    pub async fn get_active_symbols_to_update(&self, db_pool: &sqlx::PgPool) -> AppResult<()> {
+        // This method would need to be implemented to get symbols from database
+        // For now, just return Ok since the actual database calls are in the Database struct
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_should_ignore_symbol() {
+        // Should ignore symbols with "^"
+        assert!(StockListService::should_ignore_symbol("^VIX"));
+        assert!(StockListService::should_ignore_symbol("SPY^"));
+        assert!(StockListService::should_ignore_symbol("ABC^DEF"));
+        
+        // Should ignore empty symbols
+        assert!(StockListService::should_ignore_symbol(""));
+        assert!(StockListService::should_ignore_symbol("   "));
+        assert!(StockListService::should_ignore_symbol("\t"));
+        
+        // Should NOT ignore normal symbols
+        assert!(!StockListService::should_ignore_symbol("AAPL"));
+        assert!(!StockListService::should_ignore_symbol("MSFT"));
+        assert!(!StockListService::should_ignore_symbol("GOOGL"));
+        assert!(!StockListService::should_ignore_symbol("BRK.A"));
+        assert!(!StockListService::should_ignore_symbol("BRK-A"));
     }
 }

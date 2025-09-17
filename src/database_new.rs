@@ -13,12 +13,7 @@ pub struct Database {
 
 impl Database {
     pub async fn new(database_url: &str) -> AppResult<Self> {
-        tracing::info!("Connecting to database...");
-        
-        // Simple connection without timezone parameters
         let pool = PgPool::connect(database_url).await?;
-        
-        tracing::info!("Database connection established successfully");
         Ok(Self { pool })
     }
 
@@ -395,8 +390,8 @@ impl Database {
         
         let row = sqlx::query(
             r#"
-            INSERT INTO stocks (id, symbol, name, exchange, sector, industry, market_cap, is_active, delisting_reason, last_error_at, last_error_message, priority, price_update_interval_seconds, last_price_update, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, true, NULL, NULL, NULL, 'medium', 300, NULL, $8, $8)
+            INSERT INTO stocks (id, symbol, name, exchange, sector, industry, market_cap, is_active, delisting_reason, last_error, priority, price_update_interval_seconds, last_price_update, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, true, NULL, NULL, 'medium', 300, NULL, $8, $8)
             ON CONFLICT (symbol) DO UPDATE SET
                 name = COALESCE(EXCLUDED.name, stocks.name),
                 exchange = COALESCE(EXCLUDED.exchange, stocks.exchange),
@@ -404,7 +399,7 @@ impl Database {
                 industry = COALESCE(EXCLUDED.industry, stocks.industry),
                 market_cap = COALESCE(EXCLUDED.market_cap, stocks.market_cap),
                 updated_at = EXCLUDED.updated_at
-            RETURNING id, symbol, name, exchange, sector, industry, market_cap, is_active, delisting_reason, last_error_at, last_error_message, priority, price_update_interval_seconds, last_price_update, created_at, updated_at
+            RETURNING id, symbol, name, exchange, sector, industry, market_cap, is_active, delisting_reason, last_error, priority, price_update_interval_seconds, last_price_update, created_at, updated_at
             "#
         )
         .bind(id)
@@ -428,8 +423,7 @@ impl Database {
             market_cap: row.get("market_cap"),
             is_active: row.get("is_active"),
             delisting_reason: row.get("delisting_reason"),
-            last_error_at: row.get("last_error_at"),
-            last_error_message: row.get("last_error_message"),
+            last_error: row.get("last_error"),
             priority: row.get("priority"),
             price_update_interval_seconds: row.get("price_update_interval_seconds"),
             last_price_update: row.get("last_price_update"),
@@ -440,7 +434,7 @@ impl Database {
 
     pub async fn get_stocks(&self, limit: i64, offset: i64) -> AppResult<Vec<Stock>> {
         let rows = sqlx::query(
-            "SELECT id, symbol, name, exchange, sector, industry, market_cap, is_active, delisting_reason, last_error_at, last_error_message, priority, price_update_interval_seconds, last_price_update, created_at, updated_at FROM stocks WHERE is_active = true ORDER BY symbol LIMIT $1 OFFSET $2"
+            "SELECT id, symbol, name, exchange, sector, industry, market_cap, is_active, delisting_reason, last_error, priority, price_update_interval_seconds, last_price_update, created_at, updated_at FROM stocks WHERE is_active = true ORDER BY symbol LIMIT $1 OFFSET $2"
         )
         .bind(limit)
         .bind(offset)
@@ -457,8 +451,7 @@ impl Database {
             market_cap: r.get("market_cap"),
             is_active: r.get("is_active"),
             delisting_reason: r.get("delisting_reason"),
-            last_error_at: r.get("last_error_at"),
-            last_error_message: r.get("last_error_message"),
+            last_error: r.get("last_error"),
             priority: r.get("priority"),
             price_update_interval_seconds: r.get("price_update_interval_seconds"),
             last_price_update: r.get("last_price_update"),
@@ -566,67 +559,5 @@ impl Database {
 
         let symbols = rows.into_iter().map(|r| r.get::<String, _>("symbol")).collect();
         Ok(symbols)
-    }
-
-    // Alias methods for backward compatibility
-    pub async fn get_historical_data(&self, symbol: &str, limit: i64) -> AppResult<Vec<MarketData>> {
-        self.get_market_data_history(symbol, limit).await
-    }
-
-    pub async fn get_alerts(&self, user_id: Uuid) -> AppResult<Vec<Alert>> {
-        self.get_user_alerts(user_id).await
-    }
-
-    pub async fn update_alert(&self, id: Uuid, is_active: bool) -> AppResult<()> {
-        self.update_alert_status(id, is_active).await
-    }
-
-    pub async fn get_stocks_count(&self) -> AppResult<i64> {
-        self.get_stock_count().await
-    }
-
-    pub async fn get_all_stock_symbols(&self) -> AppResult<Vec<String>> {
-        self.get_all_active_symbols().await
-    }
-
-    pub async fn get_all_active_stocks(&self, limit: Option<i64>, offset: Option<i64>) -> AppResult<Vec<Stock>> {
-        let limit = limit.unwrap_or(100);
-        let offset = offset.unwrap_or(0);
-        self.get_stocks(limit, offset).await
-    }
-
-    pub async fn create_stock(
-        &self,
-        symbol: &str,
-        name: Option<&str>,
-        exchange: Option<&str>,
-        sector: Option<&str>,
-        industry: Option<&str>,
-        market_cap: Option<i64>,
-    ) -> AppResult<Stock> {
-        self.upsert_stock(symbol, name, exchange, sector, industry, market_cap).await
-    }
-
-    pub async fn get_stocks_by_priority(&self, priority: StockPriority) -> AppResult<Vec<String>> {
-        self.get_symbols_by_priority(priority).await
-    }
-
-    pub async fn get_stocks_needing_update(&self, priority: StockPriority) -> AppResult<Vec<String>> {
-        // Use default interval based on priority
-        let interval = match priority {
-            StockPriority::High => 60,    // 1 minute
-            StockPriority::Medium => 300, // 5 minutes
-            StockPriority::Low => 900,    // 15 minutes
-        };
-        self.get_symbols_for_price_update(priority, interval).await
-    }
-
-    pub async fn set_stock_priority(&self, symbol: &str, priority: StockPriority) -> AppResult<()> {
-        let interval = match priority {
-            StockPriority::High => 60,
-            StockPriority::Medium => 300,
-            StockPriority::Low => 900,
-        };
-        self.update_stock_priority_and_interval(symbol, priority, interval).await
     }
 }

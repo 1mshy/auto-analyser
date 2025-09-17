@@ -3,6 +3,14 @@ name = "auto-analyser"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "auto-analyser"
+path = "src/main.rs"
+
+[[bin]]
+name = "simple_test"
+path = "src/simple_test.rs"
+
 [dependencies]
 # Web framework
 axum = "0.7"
@@ -13,7 +21,7 @@ tower-http = { version = "0.5", features = ["cors", "fs"] }
 tokio = { version = "1.0", features = ["full"] }
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json", "rust_decimal"] }
+sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "postgres", "uuid", "json", "chrono", "decimal"] }
 
 # Decimal support
 rust_decimal = { version = "1.0", features = ["serde"] }

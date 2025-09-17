@@ -141,6 +141,12 @@ pub struct Stock {
     pub industry: Option<String>,
     pub market_cap: Option<i64>,
     pub is_active: bool,
+    pub delisting_reason: Option<String>,
+    pub last_error_at: Option<DateTime<Utc>>,
+    pub last_error_message: Option<String>,
+    pub priority: StockPriority,
+    pub last_price_update: Option<DateTime<Utc>>,
+    pub price_update_interval_seconds: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -157,6 +163,31 @@ pub struct StockListQuery {
     pub limit: Option<i64>,
     pub sector: Option<String>,
     pub exchange: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, sqlx::Type, PartialEq, Eq, Hash)]
+#[sqlx(type_name = "stock_priority", rename_all = "lowercase")]
+pub enum StockPriority {
+    High,
+    Medium,
+    Low,
+}
+
+impl StockPriority {
+    pub fn update_interval_seconds(&self) -> u64 {
+        match self {
+            StockPriority::High => 60,    // 1 minute for watchlist stocks
+            StockPriority::Medium => 300, // 5 minutes for actively traded stocks
+            StockPriority::Low => 900,    // 15 minutes for other stocks
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PriorityMarketUpdate {
+    pub symbols: Vec<String>,
+    pub priority: StockPriority,
+    pub last_updated: Option<DateTime<Utc>>,
 }
 
 impl From<User> for UserResponse {

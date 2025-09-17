@@ -22,12 +22,11 @@ fn default_limit() -> i64 {
 }
 
 pub async fn get_quote(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(symbol): Path<String>,
 ) -> AppResult<Json<QuoteResponse>> {
     let market_service = MarketDataService::new();
-    let quote = market_service.fetch_current_quote(&symbol).await?;
-    
+    let quote = market_service.fetch_current_quote_with_delisting_check(&symbol, state.db.pool()).await?;
     Ok(Json(quote))
 }
 

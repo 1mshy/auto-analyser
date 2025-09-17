@@ -9,6 +9,7 @@ pub struct Config {
     pub jwt_secret: String,
     pub market_data_interval_seconds: u64,
     pub alert_check_interval_seconds: u64,
+    pub enable_priority_scheduling: bool,
 }
 
 impl Config {
@@ -29,6 +30,10 @@ impl Config {
             alert_check_interval_seconds: env::var("ALERT_CHECK_INTERVAL_SECONDS")
                 .unwrap_or_else(|_| "60".to_string()) // 1 minute
                 .parse()?,
+            enable_priority_scheduling: env::var("ENABLE_PRIORITY_SCHEDULING")
+                .unwrap_or_else(|_| "true".to_string())
+                .parse()
+                .unwrap_or(true),
         })
     }
 }
