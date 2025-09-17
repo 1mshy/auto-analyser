@@ -5,6 +5,58 @@ use anyhow::Result;
 use ta::indicators::{SimpleMovingAverage, RelativeStrengthIndex, MovingAverageConvergenceDivergence};
 use ta::{Next, Reset};
 use std::collections::HashMap;
+use reqwest;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TickerInfo {
+    pub symbol: String,
+    pub name: String,
+    pub last_sale: Option<String>,
+    pub net_change: Option<String>,
+    pub pct_change: Option<String>,
+    pub market_cap: Option<String>,
+    pub country: Option<String>,
+    pub ipo_year: Option<String>,
+    pub volume: Option<String>,
+    pub sector: Option<String>,
+    pub industry: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct NasdaqApiResponse {
+    data: NasdaqData,
+}
+
+#[derive(Debug, Deserialize)]
+struct NasdaqData {
+    table: NasdaqTable,
+}
+
+#[derive(Debug, Deserialize)]
+struct NasdaqTable {
+    rows: Vec<NasdaqRow>,
+}
+
+#[derive(Debug, Deserialize)]
+struct NasdaqRow {
+    symbol: String,
+    name: String,
+    #[serde(rename = "lastsale")]
+    last_sale: Option<String>,
+    #[serde(rename = "netchange")]
+    net_change: Option<String>,
+    #[serde(rename = "pctchange")]
+    pct_change: Option<String>,
+    #[serde(rename = "marketCap")]
+    market_cap: Option<String>,
+    country: Option<String>,
+    #[serde(rename = "ipoyear")]
+    ipo_year: Option<String>,
+    volume: Option<String>,
+    sector: Option<String>,
+    industry: Option<String>,
+}
 
 #[derive(Debug, Clone)]
 pub struct StockData {
@@ -17,7 +69,7 @@ pub struct StockData {
     pub volume: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TechnicalIndicators {
     pub sma_20: Option<f64>,
     pub sma_50: Option<f64>,
@@ -221,6 +273,170 @@ impl StockAnalyzer {
                     println!("  • {}", signal);
                 }
             }
+        }
+    }
+
+    /// Fetch all available tickers from Nasdaq API
+    pub async fn fetch_all_tickers() -> Result<Vec<TickerInfo>> {
+        let url = "https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=0";
+        
+        let client = reqwest::Client::new();
+        let response = client
+            .get(url)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .send()
+            .await?;
+
+        let nasdaq_response: NasdaqApiResponse = response.json().await?;
+        
+        let mut tickers = Vec::new();
+        for row in nasdaq_response.data.table.rows {
+            tickers.push(TickerInfo {
+                symbol: row.symbol,
+                name: row.name,
+                last_sale: row.last_sale,
+                net_change: row.net_change,
+                pct_change: row.pct_change,
+                market_cap: row.market_cap,
+                country: row.country,
+                ipo_year: row.ipo_year,
+                volume: row.volume,
+                sector: row.sector,
+                industry: row.industry,
+            });
+        }
+        
+        println!("📊 Fetched {} tickers from Nasdaq API", tickers.len());
+        Ok(tickers)
+    }
+
+    /// Filter tickers by various criteria
+    pub fn filter_tickers(
+        tickers: &[TickerInfo],
+        sector: Option<&str>,
+        min_market_cap: Option<f64>,
+        country: Option<&str>,
+    ) -> Vec<TickerInfo> {
+        tickers
+            .iter()
+            .filter(|ticker| {
+                // Filter by sector if specified
+                if let Some(sector_filter) = sector {
+                    if let Some(ticker_sector) = &ticker.sector {
+                        if !ticker_sector.to_lowercase().contains(&sector_filter.to_lowercase()) {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+
+                // Filter by minimum market cap if specified
+                if let Some(min_cap) = min_market_cap {
+                    if let Some(market_cap_str) = &ticker.market_cap {
+                        if let Ok(market_cap) = Self::parse_market_cap(market_cap_str) {
+                            if market_cap < min_cap {
+                                return false;
+                            }
+                        } else {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+
+                // Filter by country if specified
+                if let Some(country_filter) = country {
+                    if let Some(ticker_country) = &ticker.country {
+                        if !ticker_country.to_lowercase().contains(&country_filter.to_lowercase()) {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+
+                true
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Parse market cap string (e.g., "$1.5B", "$500M") to float
+    fn parse_market_cap(market_cap_str: &str) -> Result<f64, std::num::ParseFloatError> {
+        let cleaned = market_cap_str.replace('$', "").replace(',', "");
+        
+        if cleaned.ends_with('B') {
+            let num_str = cleaned.trim_end_matches('B');
+            let num: f64 = num_str.parse()?;
+            Ok(num * 1_000_000_000.0)
+        } else if cleaned.ends_with('M') {
+            let num_str = cleaned.trim_end_matches('M');
+            let num: f64 = num_str.parse()?;
+            Ok(num * 1_000_000.0)
+        } else if cleaned.ends_with('K') {
+            let num_str = cleaned.trim_end_matches('K');
+            let num: f64 = num_str.parse()?;
+            Ok(num * 1_000.0)
+        } else {
+            cleaned.parse()
+        }
+    }
+
+    /// Get top performing tickers by percentage change
+    pub fn get_top_performers(tickers: &[TickerInfo], limit: usize) -> Vec<TickerInfo> {
+        let mut sorted_tickers: Vec<TickerInfo> = tickers
+            .iter()
+            .filter_map(|ticker| {
+                if let Some(pct_change_str) = &ticker.pct_change {
+                    let cleaned = pct_change_str.replace('%', "");
+                    if cleaned.parse::<f64>().is_ok() {
+                        let ticker_clone = ticker.clone();
+                        // Store the parsed percentage for sorting
+                        return Some(ticker_clone);
+                    }
+                }
+                None
+            })
+            .collect();
+
+        // Sort by percentage change (descending)
+        sorted_tickers.sort_by(|a, b| {
+            let a_pct = a.pct_change.as_ref()
+                .and_then(|s| s.replace('%', "").parse::<f64>().ok())
+                .unwrap_or(0.0);
+            let b_pct = b.pct_change.as_ref()
+                .and_then(|s| s.replace('%', "").parse::<f64>().ok())
+                .unwrap_or(0.0);
+            b_pct.partial_cmp(&a_pct).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        sorted_tickers.into_iter().take(limit).collect()
+    }
+
+    /// Print ticker information in a formatted table
+    pub fn print_tickers(tickers: &[TickerInfo], title: &str) {
+        println!("\n{}", "=".repeat(80));
+        println!("📊 {}", title);
+        println!("{}", "=".repeat(80));
+        println!("{:<8} {:<30} {:<12} {:<10} {:<15} {:<20}", 
+                 "Symbol", "Name", "Last Sale", "Change%", "Market Cap", "Sector");
+        println!("{}", "-".repeat(80));
+
+        for ticker in tickers.iter().take(20) { // Show max 20 for readability
+            println!("{:<8} {:<30} {:<12} {:<10} {:<15} {:<20}",
+                ticker.symbol,
+                ticker.name.chars().take(28).collect::<String>(),
+                ticker.last_sale.as_deref().unwrap_or("N/A"),
+                ticker.pct_change.as_deref().unwrap_or("N/A"),
+                ticker.market_cap.as_deref().unwrap_or("N/A"),
+                ticker.sector.as_deref().unwrap_or("N/A").chars().take(18).collect::<String>()
+            );
+        }
+        
+        if tickers.len() > 20 {
+            println!("... and {} more tickers", tickers.len() - 20);
         }
     }
 }

@@ -6,12 +6,15 @@ A Rust-based stock market analysis tool that fetches real-time and historical da
 
 - 📈 **Real-time Stock Data**: Fetch current quotes for any stock symbol
 - 📊 **Historical Data**: Retrieve historical stock data for analysis
+- 🎯 **Ticker Collection**: Fetch all available tickers from Nasdaq API with filtering capabilities
 - 🔍 **Technical Indicators**: Calculate popular technical indicators including:
   - Simple Moving Averages (SMA 20, SMA 50)
   - Relative Strength Index (RSI)
   - Moving Average Convergence Divergence (MACD)
 - 🚨 **Trading Signals**: Basic signal detection for overbought/oversold conditions and trend analysis
 - 📋 **Multi-Symbol Analysis**: Analyze multiple stocks in a single run
+- 🏢 **Smart Filtering**: Filter stocks by sector, market cap, country, and performance
+- 🏆 **Top Performers**: Automatically identify best performing stocks
 
 ## Dependencies
 
@@ -21,6 +24,24 @@ A Rust-based stock market analysis tool that fetches real-time and historical da
 - `chrono` & `time`: Date and time handling
 - `anyhow`: Error handling
 
+## Quick Start
+
+```bash
+# Clone and setup
+git clone <your-repo-url>
+cd auto-analyser
+./setup.sh
+
+# Run complete analysis pipeline
+cargo run --example complete_analysis
+
+# Explore 7000+ available tickers
+cargo run --example ticker_collection
+
+# Simple single-stock analysis
+cargo run --example simple_analysis
+```
+
 ## Usage
 
 ### Basic Example
@@ -29,7 +50,28 @@ A Rust-based stock market analysis tool that fetches real-time and historical da
 cargo run
 ```
 
-This will analyze the default stocks (AAPL, GOOGL, MSFT, TSLA) with the last 100 days of data.
+This will fetch today's top performers from Nasdaq and analyze them along with some stable large-cap stocks.
+
+### Ticker Collection
+
+```bash
+cargo run --example ticker_collection
+```
+
+This will:
+- Fetch all available tickers from Nasdaq API
+- Show top performers by percentage change
+- Filter by sector (Technology, Healthcare, etc.)
+- Filter by market cap
+- Display sector distribution
+
+### Single Stock Analysis
+
+```bash
+cargo run --example simple_analysis
+```
+
+This will analyze Apple (AAPL) with 30 days of data and show trend analysis.
 
 ### Customizing Analysis
 
@@ -126,6 +168,33 @@ if let (Some(bb_upper), Some(bb_lower)) = (indicators.bb_upper, indicators.bb_lo
         signals.push("Bollinger Bands Squeeze Detected".to_string());
     }
 }
+```
+
+### New Ticker Collection Features
+
+1. **Fetch All Tickers**:
+```rust
+let tickers = StockAnalyzer::fetch_all_tickers().await?;
+```
+
+2. **Filter by Criteria**:
+```rust
+let tech_stocks = StockAnalyzer::filter_tickers(
+    &tickers,
+    Some("Technology"),  // Sector filter
+    Some(1_000_000_000.0), // Min market cap ($1B)
+    Some("United States"), // Country filter
+);
+```
+
+3. **Get Top Performers**:
+```rust
+let top_10 = StockAnalyzer::get_top_performers(&tickers, 10);
+```
+
+4. **Display Formatted Results**:
+```rust
+StockAnalyzer::print_tickers(&top_10, "Top Performers");
 ```
 
 ## Error Handling

@@ -1,3 +1,3 @@
 pub mod analyzer;
 
-pub use analyzer::{StockAnalyzer, StockData, TechnicalIndicators};
+pub use analyzer::{StockAnalyzer, StockData, TechnicalIndicators, TickerInfo};
