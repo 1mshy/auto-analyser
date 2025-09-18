@@ -1,12 +1,14 @@
-use yahoo_finance_api as yahoo;
-use chrono::{DateTime, Utc};
-use time::OffsetDateTime;
 use anyhow::Result;
-use ta::indicators::{SimpleMovingAverage, RelativeStrengthIndex, MovingAverageConvergenceDivergence};
-use ta::{Next, Reset};
-use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 use reqwest;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use ta::indicators::{
+    MovingAverageConvergenceDivergence, RelativeStrengthIndex, SimpleMovingAverage,
+};
+use ta::{Next, Reset};
+use time::OffsetDateTime;
+use yahoo_finance_api as yahoo;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TickerInfo {
@@ -89,12 +91,34 @@ struct IndicatorSet {
     macd: MovingAverageConvergenceDivergence,
 }
 
+struct PriceChange {
+    pub symbol: String,
+    pub percent_change: f64,
+    pub start_price: f64,
+    pub end_price: f64,
+}
+
+struct AnalysisResult {
+    pub symbol: String,
+    pub priority: u32,
+    pub latest_data: StockData,
+    pub latest_indicators: TechnicalIndicators,
+}
+
 impl StockAnalyzer {
     pub fn new() -> Self {
         Self {
             provider: yahoo::YahooConnector::new().unwrap(),
             indicators: HashMap::new(),
         }
+    }
+    /**
+     * Fetches all historical stock data of a symbol in 1 day intervals
+     */
+    pub async fn fetch_all_stock_data(&self, symbol: &str) -> Result<Vec<StockData>> {
+        return self
+            .fetch_stock_data(symbol, DateTime::<Utc>::UNIX_EPOCH, Utc::now())
+            .await;
     }
 
     /// Fetch historical stock data for a given symbol
@@ -107,7 +131,7 @@ impl StockAnalyzer {
         // Convert chrono DateTime to time OffsetDateTime
         let start_time = OffsetDateTime::from_unix_timestamp(start.timestamp())?;
         let end_time = OffsetDateTime::from_unix_timestamp(end.timestamp())?;
-        
+
         let response = self
             .provider
             .get_quote_history(symbol, start_time, end_time)
@@ -141,8 +165,7 @@ impl StockAnalyzer {
 
         Ok(StockData {
             symbol: symbol.to_string(),
-            timestamp: DateTime::from_timestamp(quote.timestamp as i64, 0)
-                .unwrap_or(Utc::now()),
+            timestamp: DateTime::from_timestamp(quote.timestamp as i64, 0).unwrap_or(Utc::now()),
             open: quote.open,
             high: quote.high,
             low: quote.low,
@@ -173,7 +196,7 @@ impl StockAnalyzer {
         }
 
         let mut results = Vec::new();
-        
+
         if let Some(indicators) = self.indicators.get_mut(symbol) {
             // Reset indicators
             indicators.sma_20.reset();
@@ -200,7 +223,11 @@ impl StockAnalyzer {
     }
 
     /// Analyze stock with basic signals
-    pub fn analyze_signals(&self, data: &StockData, indicators: &TechnicalIndicators) -> Vec<String> {
+    pub fn analyze_signals(
+        &self,
+        data: &StockData,
+        indicators: &TechnicalIndicators,
+    ) -> Vec<String> {
         let mut signals = Vec::new();
 
         // RSI signals
@@ -241,14 +268,16 @@ impl StockAnalyzer {
         indicators: &[TechnicalIndicators],
     ) {
         println!("=== Stock Analysis for {} ===", symbol);
-        
-        if let (Some(latest_data), Some(latest_indicators)) = 
-            (stock_data.last(), indicators.last()) {
-            
-            println!("Latest Data ({}):", latest_data.timestamp.format("%Y-%m-%d"));
+
+        if let (Some(latest_data), Some(latest_indicators)) = (stock_data.last(), indicators.last())
+        {
+            println!(
+                "Latest Data ({}):",
+                latest_data.timestamp.format("%Y-%m-%d")
+            );
             println!("  Price: ${:.2}", latest_data.close);
             println!("  Volume: {}", latest_data.volume);
-            
+
             println!("\nTechnical Indicators:");
             if let Some(sma_20) = latest_indicators.sma_20 {
                 println!("  SMA(20): ${:.2}", sma_20);
@@ -260,8 +289,10 @@ impl StockAnalyzer {
                 println!("  RSI(14): {:.2}", rsi);
             }
             if let Some((macd, signal, histogram)) = latest_indicators.macd {
-                println!("  MACD: {:.4}, Signal: {:.4}, Histogram: {:.4}", 
-                         macd, signal, histogram);
+                println!(
+                    "  MACD: {:.4}, Signal: {:.4}, Histogram: {:.4}",
+                    macd, signal, histogram
+                );
             }
 
             println!("\nSignals:");
@@ -275,22 +306,33 @@ impl StockAnalyzer {
             }
         }
     }
+    /**
+     * Fetches n amount of tickers from the nasdaq api.
+     * NOTE: count=0 infers max amount
+     */
+    pub async fn fetch_n_tickers(count: usize) -> Result<Vec<TickerInfo>> {
+        let url = format!(
+            "https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit={}",
+            count
+        );
 
-    /// Fetch all available tickers from Nasdaq API
-    pub async fn fetch_all_tickers() -> Result<Vec<TickerInfo>> {
-        let url = "https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=0";
-        
         let client = reqwest::Client::new();
         let response = client
             .get(url)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            )
             .send()
             .await?;
 
         let nasdaq_response: NasdaqApiResponse = response.json().await?;
-        
+
         let mut tickers = Vec::new();
         for row in nasdaq_response.data.table.rows {
+            if row.symbol.contains("^") || row.symbol.contains("/") {
+                continue; // Skip indices and special symbols
+            }
             tickers.push(TickerInfo {
                 symbol: row.symbol,
                 name: row.name,
@@ -305,9 +347,14 @@ impl StockAnalyzer {
                 industry: row.industry,
             });
         }
-        
+
         println!("📊 Fetched {} tickers from Nasdaq API", tickers.len());
         Ok(tickers)
+    }
+
+    /// Fetch all available tickers from Nasdaq API
+    pub async fn fetch_all_tickers() -> Result<Vec<TickerInfo>> {
+        return StockAnalyzer::fetch_n_tickers(0).await;
     }
 
     /// Filter tickers by various criteria
@@ -323,7 +370,10 @@ impl StockAnalyzer {
                 // Filter by sector if specified
                 if let Some(sector_filter) = sector {
                     if let Some(ticker_sector) = &ticker.sector {
-                        if !ticker_sector.to_lowercase().contains(&sector_filter.to_lowercase()) {
+                        if !ticker_sector
+                            .to_lowercase()
+                            .contains(&sector_filter.to_lowercase())
+                        {
                             return false;
                         }
                     } else {
@@ -349,7 +399,10 @@ impl StockAnalyzer {
                 // Filter by country if specified
                 if let Some(country_filter) = country {
                     if let Some(ticker_country) = &ticker.country {
-                        if !ticker_country.to_lowercase().contains(&country_filter.to_lowercase()) {
+                        if !ticker_country
+                            .to_lowercase()
+                            .contains(&country_filter.to_lowercase())
+                        {
                             return false;
                         }
                     } else {
@@ -366,7 +419,7 @@ impl StockAnalyzer {
     /// Parse market cap string (e.g., "$1.5B", "$500M") to float
     fn parse_market_cap(market_cap_str: &str) -> Result<f64, std::num::ParseFloatError> {
         let cleaned = market_cap_str.replace('$', "").replace(',', "");
-        
+
         if cleaned.ends_with('B') {
             let num_str = cleaned.trim_end_matches('B');
             let num: f64 = num_str.parse()?;
@@ -403,13 +456,19 @@ impl StockAnalyzer {
 
         // Sort by percentage change (descending)
         sorted_tickers.sort_by(|a, b| {
-            let a_pct = a.pct_change.as_ref()
+            let a_pct = a
+                .pct_change
+                .as_ref()
                 .and_then(|s| s.replace('%', "").parse::<f64>().ok())
                 .unwrap_or(0.0);
-            let b_pct = b.pct_change.as_ref()
+            let b_pct = b
+                .pct_change
+                .as_ref()
                 .and_then(|s| s.replace('%', "").parse::<f64>().ok())
                 .unwrap_or(0.0);
-            b_pct.partial_cmp(&a_pct).unwrap_or(std::cmp::Ordering::Equal)
+            b_pct
+                .partial_cmp(&a_pct)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         sorted_tickers.into_iter().take(limit).collect()
@@ -420,21 +479,31 @@ impl StockAnalyzer {
         println!("\n{}", "=".repeat(80));
         println!("📊 {}", title);
         println!("{}", "=".repeat(80));
-        println!("{:<8} {:<30} {:<12} {:<10} {:<15} {:<20}", 
-                 "Symbol", "Name", "Last Sale", "Change%", "Market Cap", "Sector");
+        println!(
+            "{:<8} {:<30} {:<12} {:<10} {:<15} {:<20}",
+            "Symbol", "Name", "Last Sale", "Change%", "Market Cap", "Sector"
+        );
         println!("{}", "-".repeat(80));
 
-        for ticker in tickers.iter().take(20) { // Show max 20 for readability
-            println!("{:<8} {:<30} {:<12} {:<10} {:<15} {:<20}",
+        for ticker in tickers.iter().take(20) {
+            // Show max 20 for readability
+            println!(
+                "{:<8} {:<30} {:<12} {:<10} {:<15} {:<20}",
                 ticker.symbol,
                 ticker.name.chars().take(28).collect::<String>(),
                 ticker.last_sale.as_deref().unwrap_or("N/A"),
                 ticker.pct_change.as_deref().unwrap_or("N/A"),
                 ticker.market_cap.as_deref().unwrap_or("N/A"),
-                ticker.sector.as_deref().unwrap_or("N/A").chars().take(18).collect::<String>()
+                ticker
+                    .sector
+                    .as_deref()
+                    .unwrap_or("N/A")
+                    .chars()
+                    .take(18)
+                    .collect::<String>()
             );
         }
-        
+
         if tickers.len() > 20 {
             println!("... and {} more tickers", tickers.len() - 20);
         }
