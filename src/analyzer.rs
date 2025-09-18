@@ -4,7 +4,7 @@ use reqwest;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use ta::indicators::{
-    MovingAverageConvergenceDivergence, RelativeStrengthIndex, SimpleMovingAverage,
+    MovingAverageConvergenceDivergence, SimpleMovingAverage,
 };
 use ta::{Next, Reset};
 use time::OffsetDateTime;
@@ -87,8 +87,84 @@ pub struct StockAnalyzer {
 struct IndicatorSet {
     sma_20: SimpleMovingAverage,
     sma_50: SimpleMovingAverage,
-    rsi: RelativeStrengthIndex,
+    rsi: CustomRSI,
     macd: MovingAverageConvergenceDivergence,
+}
+
+/// Custom RSI implementation that matches TradingView's calculation
+/// Uses Wilder's smoothing method (exponential moving average with alpha = 1/period)
+#[derive(Debug, Clone)]
+struct CustomRSI {
+    period: usize,
+    avg_gain: Option<f64>,
+    avg_loss: Option<f64>,
+    previous_close: Option<f64>,
+    count: usize,
+    initial_gains: Vec<f64>,
+    initial_losses: Vec<f64>,
+}
+
+impl CustomRSI {
+    fn new(period: usize) -> Self {
+        Self {
+            period,
+            avg_gain: None,
+            avg_loss: None,
+            previous_close: None,
+            count: 0,
+            initial_gains: Vec::new(),
+            initial_losses: Vec::new(),
+        }
+    }
+
+    fn next(&mut self, close: f64) -> Option<f64> {
+        if let Some(prev_close) = self.previous_close {
+            let change = close - prev_close;
+            let gain = if change > 0.0 { change } else { 0.0 };
+            let loss = if change < 0.0 { -change } else { 0.0 };
+
+            if self.count < self.period {
+                // Collect initial values for the first period
+                self.initial_gains.push(gain);
+                self.initial_losses.push(loss);
+                self.count += 1;
+
+                if self.count == self.period {
+                    // Calculate initial averages using simple moving average
+                    self.avg_gain = Some(self.initial_gains.iter().sum::<f64>() / self.period as f64);
+                    self.avg_loss = Some(self.initial_losses.iter().sum::<f64>() / self.period as f64);
+                }
+            } else {
+                // Use Wilder's smoothing for subsequent values
+                let alpha = 1.0 / self.period as f64;
+                self.avg_gain = Some(alpha * gain + (1.0 - alpha) * self.avg_gain.unwrap());
+                self.avg_loss = Some(alpha * loss + (1.0 - alpha) * self.avg_loss.unwrap());
+            }
+
+            // Calculate RSI if we have enough data
+            if let (Some(avg_gain), Some(avg_loss)) = (self.avg_gain, self.avg_loss) {
+                if avg_loss == 0.0 {
+                    return Some(100.0);
+                }
+                let rs = avg_gain / avg_loss;
+                let rsi = 100.0 - (100.0 / (1.0 + rs));
+                self.previous_close = Some(close);
+                return Some(rsi);
+            }
+        }
+
+        self.previous_close = Some(close);
+        None
+    }
+
+    fn reset(&mut self) {
+        self.avg_gain = None;
+        self.avg_loss = None;
+        self.previous_close = None;
+        self.count = 0;
+        self.initial_gains.clear();
+        self.initial_losses.clear();
+    }
 }
 
 struct PriceChange {
@@ -179,7 +255,7 @@ impl StockAnalyzer {
         let indicator_set = IndicatorSet {
             sma_20: SimpleMovingAverage::new(20).unwrap(),
             sma_50: SimpleMovingAverage::new(50).unwrap(),
-            rsi: RelativeStrengthIndex::new(14).unwrap(),
+            rsi: CustomRSI::new(14),
             macd: MovingAverageConvergenceDivergence::new(12, 26, 9).unwrap(),
         };
         self.indicators.insert(symbol.to_string(), indicator_set);
@@ -213,7 +289,7 @@ impl StockAnalyzer {
                 results.push(TechnicalIndicators {
                     sma_20: Some(sma_20),
                     sma_50: Some(sma_50),
-                    rsi: Some(rsi),
+                    rsi: rsi,
                     macd: Some((macd_result.macd, macd_result.signal, macd_result.histogram)),
                 });
             }
