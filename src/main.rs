@@ -11,6 +11,8 @@ async fn main() -> Result<()> {
     let mut prior: PriorityQueue<String, i32> = PriorityQueue::new();
     let mut analyser = StockAnalyzer::new();
 
+    let top = StockAnalyzer::fetch_n_tickers(100).await.unwrap();
+
     // First, demonstrate ticker collection
     println!("📡 Fetching available tickers from Nasdaq...");
     match StockAnalyzer::fetch_all_tickers().await {
@@ -19,22 +21,25 @@ async fn main() -> Result<()> {
             for ticker in all_tickers {
                 prior.push(ticker.symbol, 5);
             }
+            for ticker in top {
+                prior.push(ticker.symbol, 10);
 
-            prior.push("TSLA".to_string(), 10);
-            prior.push("AAPL".to_string(), 15);
-            prior.push("MSFT".to_string(), 10);
-            prior.push("GOOGL".to_string(), 10);
-            prior.push("TSLA".to_string(), 20);
-            prior.push("AMZN".to_string(), 15);
+            }
 
             while let Some((ticker, _priority)) = prior.pop() {
-                let stock_data = analyser.fetch_all_stock_data(&ticker).await.unwrap();
+                let stock_data = match analyser.fetch_all_stock_data(&ticker).await {
+                    Ok(data) => data,
+                    Err(e) => {
+                        println!("{}", e);
+                        println!("Failed to fetch data for {}", ticker);
+                        continue;
+                    }
+                };
                 let ticker_indicators = analyser.calculate_indicators(&ticker, &stock_data);
-                println!(
-                    "{}: {:?}",
-                    ticker,
-                    ticker_indicators[ticker_indicators.len() - 1].rsi
-                );
+                let current_rsi = ticker_indicators[ticker_indicators.len() - 1].rsi.unwrap();
+                if current_rsi < 30.0 {
+                    println!("{} is at a {} rsi", ticker, current_rsi);
+                }
             }
         }
         Err(e) => {
