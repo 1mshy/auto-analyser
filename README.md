@@ -1,6 +1,6 @@
 # Auto Stock Analyser
 
-A Rust-based stock market analysis tool that fetches real-time and historical data using Yahoo Finance API and calculates technical indicators.
+A Rust-based stock market analysis tool that fetches real-time and historical data using Yahoo Finance API and calculates technical indicators with advanced customizable filtering.
 
 ## Features
 
@@ -13,21 +13,30 @@ A Rust-based stock market analysis tool that fetches real-time and historical da
   - Moving Average Convergence Divergence (MACD)
 - 🚨 **Trading Signals**: Basic signal detection for overbought/oversold conditions and trend analysis
 - 📋 **Multi-Symbol Analysis**: Analyze multiple stocks in a single run
-- 🏢 **Smart Filtering**: Filter stocks by sector, market cap, country, and performance
-- 🏆 **Top Performers**: Automatically identify best performing stocks
-
-## Dependencies
-
-- `yahoo_finance_api`: For fetching stock data from Yahoo Finance
-- `ta`: Technical analysis indicators library
-- `tokio`: Async runtime for handling API requests
-- `chrono` & `time`: Date and time handling
-- `anyhow`: Error handling
+- 🏢 **Advanced Filtering**: Customizable filters for:
+  - Market capitalization ranges
+  - Price ranges
+  - Trading volume
+  - Percentage change (daily performance)
+  - RSI-based conditions (oversold/overbought)
+  - Sector and industry focus
+  - Geographic filters
+  - IPO year ranges
+- 🏆 **Opportunity Detection**: Smart identification of investment opportunities based on your criteria
+- ⚡ **Performance Optimized**: Rate-limited analysis to prevent API throttling
 
 ## Quick Start
 
+### Basic Usage
 ```bash
-# Clone and setup
+# Clone and run with default settings
+git clone <repository-url>
+cd auto-analyser
+cargo run
+```
+
+### Customizing Your Analysis
+Edit the `create_custom_filter()` function in `src/main.rs` to set your criteria:
 git clone <your-repo-url>
 cd auto-analyser
 ./setup.sh
@@ -225,3 +234,79 @@ Feel free to contribute by:
 ## License
 
 This project is open source and available under the MIT License.
+
+## Customizing Your Analysis
+Edit the `create_custom_filter()` function in `src/main.rs` to set your criteria:
+
+```rust
+fn create_custom_filter() -> StockFilter {
+    StockFilter::new()
+        // Market cap range: $1B to $50B
+        .with_market_cap_range(Some(1_000_000_000.0), Some(50_000_000_000.0))
+        
+        // Price range: $10 to $300
+        .with_price_range(Some(10.0), Some(300.0))
+        
+        // Look for recent gainers (2% to 15% daily change)
+        .with_pct_change_range(Some(2.0), Some(15.0))
+        
+        // Find oversold opportunities (RSI < 30)
+        .with_rsi_thresholds(Some(30.0), Some(70.0))
+}
+```
+
+### Example Configurations
+See `cargo run --example filter_examples` for pre-built filter configurations:
+
+- **Large Cap Value**: Focus on established companies showing recent declines
+- **Growth Momentum**: High-growth potential stocks with positive trends  
+- **Conservative Large**: Stable mega-cap stocks with low volatility
+- **Oversold Recovery**: Undervalued stocks with recovery potential
+
+```bash
+# Run main analysis with your custom filters
+cargo run
+
+# Explore different filter configurations  
+cargo run --example filter_examples
+
+# See all available tickers and data structure
+cargo run --example debug_tickers
+
+# Test custom filtering configurations
+cargo run --example custom_filters
+```
+
+## Filter Criteria Available
+
+- **Market Capitalization**: Set min/max market cap ranges
+- **Stock Price**: Filter by current stock price
+- **Trading Volume**: Minimum volume requirements
+- **Daily Performance**: Percentage change filters
+- **RSI Conditions**: Oversold/overbought detection
+- **Sector Focus**: Target specific business sectors
+- **Geographic**: Filter by company location
+- **Company Age**: IPO year-based filtering
+
+## Investment Strategies Supported
+
+1. **Value Investing**: Find undervalued stocks with strong fundamentals
+2. **Growth Investing**: Identify stocks with strong momentum and growth potential
+3. **Momentum Trading**: Spot stocks with recent positive performance trends
+4. **Contrarian Investing**: Find oversold stocks ready for recovery
+5. **Large Cap Safety**: Focus on established, stable companies
+
+## Performance Notes
+
+- Analysis is rate-limited to prevent API throttling
+- Processes up to 100 stocks per run by default
+- Real-time RSI calculation for opportunity detection
+- Intelligent prioritization of top-performing stocks
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit pull requests, report bugs, or suggest new features.
+
+## Disclaimer
+
+This tool is for educational and research purposes only. Not financial advice. Always do your own research before making investment decisions.

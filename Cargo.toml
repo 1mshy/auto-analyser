@@ -10,6 +10,7 @@ repository = "https://github.com/yourusername/auto-analyser"
 name = "auto-analyser"
 path = "src/main.rs"
 
+
 [lib]
 name = "auto_analyser"
 path = "src/lib.rs"

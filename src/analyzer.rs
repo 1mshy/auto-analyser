@@ -23,6 +23,114 @@ pub struct TickerInfo {
     pub industry: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct StockFilter {
+    pub min_market_cap: Option<f64>,
+    pub max_market_cap: Option<f64>,
+    pub min_price: Option<f64>,
+    pub max_price: Option<f64>,
+    pub min_volume: Option<u64>,
+    pub max_volume: Option<u64>,
+    pub min_pct_change: Option<f64>,
+    pub max_pct_change: Option<f64>,
+    pub min_rsi: Option<f64>,
+    pub max_rsi: Option<f64>,
+    pub sectors: Option<Vec<String>>,
+    pub countries: Option<Vec<String>>,
+    pub industries: Option<Vec<String>>,
+    pub min_ipo_year: Option<i32>,
+    pub max_ipo_year: Option<i32>,
+    pub oversold_rsi_threshold: Option<f64>,
+    pub overbought_rsi_threshold: Option<f64>,
+}
+
+impl Default for StockFilter {
+    fn default() -> Self {
+        Self {
+            min_market_cap: None,
+            max_market_cap: None,
+            min_price: None,
+            max_price: None,
+            min_volume: None,
+            max_volume: None,
+            min_pct_change: None,
+            max_pct_change: None,
+            min_rsi: None,
+            max_rsi: None,
+            sectors: None,
+            countries: None,
+            industries: None,
+            min_ipo_year: None,
+            max_ipo_year: None,
+            oversold_rsi_threshold: Some(30.0),
+            overbought_rsi_threshold: Some(70.0),
+        }
+    }
+}
+
+impl StockFilter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_market_cap_range(mut self, min: Option<f64>, max: Option<f64>) -> Self {
+        self.min_market_cap = min;
+        self.max_market_cap = max;
+        self
+    }
+
+    pub fn with_price_range(mut self, min: Option<f64>, max: Option<f64>) -> Self {
+        self.min_price = min;
+        self.max_price = max;
+        self
+    }
+
+    pub fn with_volume_range(mut self, min: Option<u64>, max: Option<u64>) -> Self {
+        self.min_volume = min;
+        self.max_volume = max;
+        self
+    }
+
+    pub fn with_pct_change_range(mut self, min: Option<f64>, max: Option<f64>) -> Self {
+        self.min_pct_change = min;
+        self.max_pct_change = max;
+        self
+    }
+
+    pub fn with_rsi_range(mut self, min: Option<f64>, max: Option<f64>) -> Self {
+        self.min_rsi = min;
+        self.max_rsi = max;
+        self
+    }
+
+    pub fn with_sectors(mut self, sectors: Vec<String>) -> Self {
+        self.sectors = Some(sectors);
+        self
+    }
+
+    pub fn with_countries(mut self, countries: Vec<String>) -> Self {
+        self.countries = Some(countries);
+        self
+    }
+
+    pub fn with_industries(mut self, industries: Vec<String>) -> Self {
+        self.industries = Some(industries);
+        self
+    }
+
+    pub fn with_ipo_year_range(mut self, min: Option<i32>, max: Option<i32>) -> Self {
+        self.min_ipo_year = min;
+        self.max_ipo_year = max;
+        self
+    }
+
+    pub fn with_rsi_thresholds(mut self, oversold: Option<f64>, overbought: Option<f64>) -> Self {
+        self.oversold_rsi_threshold = oversold;
+        self.overbought_rsi_threshold = overbought;
+        self
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct NasdaqApiResponse {
     data: NasdaqData,
@@ -87,20 +195,6 @@ struct IndicatorSet {
     sma_50: SimpleMovingAverage,
     rsi: CustomRSI,
     macd: MovingAverageConvergenceDivergence,
-}
-
-struct PriceChange {
-    pub symbol: String,
-    pub percent_change: f64,
-    pub start_price: f64,
-    pub end_price: f64,
-}
-
-struct AnalysisResult {
-    pub symbol: String,
-    pub priority: u32,
-    pub latest_data: StockData,
-    pub latest_indicators: TechnicalIndicators,
 }
 
 impl StockAnalyzer {
@@ -355,63 +449,175 @@ impl StockAnalyzer {
         return StockAnalyzer::fetch_n_tickers(0).await;
     }
 
-    /// Filter tickers by various criteria
-    pub fn filter_tickers(
-        tickers: &[TickerInfo],
-        sector: Option<&str>,
-        min_market_cap: Option<f64>,
-        country: Option<&str>,
-    ) -> Vec<TickerInfo> {
+    /// Filter tickers by comprehensive criteria
+    pub fn filter_tickers(tickers: &[TickerInfo], filter: &StockFilter) -> Vec<TickerInfo> {
         tickers
             .iter()
-            .filter(|ticker| {
-                // Filter by sector if specified
-                if let Some(sector_filter) = sector {
-                    if let Some(ticker_sector) = &ticker.sector {
-                        if !ticker_sector
-                            .to_lowercase()
-                            .contains(&sector_filter.to_lowercase())
-                        {
-                            return false;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-
-                // Filter by minimum market cap if specified
-                if let Some(min_cap) = min_market_cap {
-                    if let Some(market_cap_str) = &ticker.market_cap {
-                        if let Ok(market_cap) = Self::parse_market_cap(market_cap_str) {
-                            if market_cap < min_cap {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-
-                // Filter by country if specified
-                if let Some(country_filter) = country {
-                    if let Some(ticker_country) = &ticker.country {
-                        if !ticker_country
-                            .to_lowercase()
-                            .contains(&country_filter.to_lowercase())
-                        {
-                            return false;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-
-                true
-            })
+            .filter(|ticker| Self::passes_basic_filters(ticker, filter))
             .cloned()
             .collect()
+    }
+
+    /// Filter tickers and their corresponding RSI values
+    pub async fn filter_tickers_with_analysis(
+        &mut self,
+        tickers: &[TickerInfo],
+        filter: &StockFilter,
+    ) -> Vec<(TickerInfo, Option<f64>)> {
+        let mut results = Vec::new();
+
+        for ticker in tickers {
+            if !Self::passes_basic_filters(ticker, filter) {
+                continue;
+            }
+
+            // Get RSI for additional filtering
+            let rsi = match self.get_current_rsi(&ticker.symbol).await {
+                Ok(rsi_value) => rsi_value,
+                Err(_) => {
+                    // If we can't get RSI, include it only if RSI filters are not specified
+                    if filter.min_rsi.is_some() || filter.max_rsi.is_some() 
+                        || filter.oversold_rsi_threshold.is_some() 
+                        || filter.overbought_rsi_threshold.is_some() {
+                        continue;
+                    }
+                    None
+                }
+            };
+
+            // Apply RSI-based filters
+            if let Some(rsi_value) = rsi {
+                if let Some(min_rsi) = filter.min_rsi {
+                    if rsi_value < min_rsi { continue; }
+                }
+                if let Some(max_rsi) = filter.max_rsi {
+                    if rsi_value > max_rsi { continue; }
+                }
+                if let Some(oversold_threshold) = filter.oversold_rsi_threshold {
+                    if rsi_value >= oversold_threshold { continue; }
+                }
+                if let Some(overbought_threshold) = filter.overbought_rsi_threshold {
+                    if rsi_value <= overbought_threshold { continue; }
+                }
+            }
+
+            results.push((ticker.clone(), rsi));
+        }
+
+        results
+    }
+
+    /// Get current RSI for a symbol
+    pub async fn get_current_rsi(&mut self, symbol: &str) -> Result<Option<f64>> {
+        let stock_data = self.fetch_all_stock_data(symbol).await?;
+        if stock_data.is_empty() {
+            return Ok(None);
+        }
+        
+        let indicators = self.calculate_indicators(symbol, &stock_data);
+        if let Some(latest_indicator) = indicators.last() {
+            Ok(latest_indicator.rsi)
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Check if a ticker passes the basic (non-RSI) filters
+    fn passes_basic_filters(ticker: &TickerInfo, filter: &StockFilter) -> bool {
+        // Filter by market cap
+        if let (Some(market_cap_str), Some(min_cap)) = (&ticker.market_cap, filter.min_market_cap) {
+            if let Ok(market_cap) = Self::parse_market_cap(market_cap_str) {
+                if market_cap < min_cap { return false; }
+            } else { return false; }
+        }
+        if let (Some(market_cap_str), Some(max_cap)) = (&ticker.market_cap, filter.max_market_cap) {
+            if let Ok(market_cap) = Self::parse_market_cap(market_cap_str) {
+                if market_cap > max_cap { return false; }
+            } else { return false; }
+        }
+
+        // Filter by price
+        if let (Some(price_str), Some(min_price)) = (&ticker.last_sale, filter.min_price) {
+            if let Ok(price) = Self::parse_price(price_str) {
+                if price < min_price { return false; }
+            } else { return false; }
+        }
+        if let (Some(price_str), Some(max_price)) = (&ticker.last_sale, filter.max_price) {
+            if let Ok(price) = Self::parse_price(price_str) {
+                if price > max_price { return false; }
+            } else { return false; }
+        }
+
+        // Filter by volume
+        if let (Some(volume_str), Some(min_volume)) = (&ticker.volume, filter.min_volume) {
+            if let Ok(volume) = Self::parse_volume(volume_str) {
+                if volume < min_volume { return false; }
+            } else { return false; }
+        }
+        if let (Some(volume_str), Some(max_volume)) = (&ticker.volume, filter.max_volume) {
+            if let Ok(volume) = Self::parse_volume(volume_str) {
+                if volume > max_volume { return false; }
+            } else { return false; }
+        }
+
+        // Filter by percentage change
+        if let (Some(pct_str), Some(min_pct)) = (&ticker.pct_change, filter.min_pct_change) {
+            if let Ok(pct) = Self::parse_percentage(pct_str) {
+                if pct < min_pct { return false; }
+            } else { return false; }
+        }
+        if let (Some(pct_str), Some(max_pct)) = (&ticker.pct_change, filter.max_pct_change) {
+            if let Ok(pct) = Self::parse_percentage(pct_str) {
+                if pct > max_pct { return false; }
+            } else { return false; }
+        }
+
+        // Filter by sectors
+        if let Some(allowed_sectors) = &filter.sectors {
+            if let Some(ticker_sector) = &ticker.sector {
+                if !allowed_sectors.iter().any(|sector| 
+                    ticker_sector.to_lowercase().contains(&sector.to_lowercase())
+                ) {
+                    return false;
+                }
+            } else { return false; }
+        }
+
+        // Filter by countries
+        if let Some(allowed_countries) = &filter.countries {
+            if let Some(ticker_country) = &ticker.country {
+                if !allowed_countries.iter().any(|country| 
+                    ticker_country.to_lowercase().contains(&country.to_lowercase())
+                ) {
+                    return false;
+                }
+            } else { return false; }
+        }
+
+        // Filter by industries
+        if let Some(allowed_industries) = &filter.industries {
+            if let Some(ticker_industry) = &ticker.industry {
+                if !allowed_industries.iter().any(|industry| 
+                    ticker_industry.to_lowercase().contains(&industry.to_lowercase())
+                ) {
+                    return false;
+                }
+            } else { return false; }
+        }
+
+        // Filter by IPO year
+        if let (Some(ipo_str), Some(min_year)) = (&ticker.ipo_year, filter.min_ipo_year) {
+            if let Ok(year) = ipo_str.parse::<i32>() {
+                if year < min_year { return false; }
+            } else { return false; }
+        }
+        if let (Some(ipo_str), Some(max_year)) = (&ticker.ipo_year, filter.max_ipo_year) {
+            if let Ok(year) = ipo_str.parse::<i32>() {
+                if year > max_year { return false; }
+            } else { return false; }
+        }
+
+        true
     }
 
     /// Parse market cap string (e.g., "$1.5B", "$500M") to float
@@ -433,6 +639,24 @@ impl StockAnalyzer {
         } else {
             cleaned.parse()
         }
+    }
+
+    /// Parse price string (e.g., "$123.45") to float
+    fn parse_price(price_str: &str) -> Result<f64, std::num::ParseFloatError> {
+        let cleaned = price_str.replace('$', "").replace(',', "");
+        cleaned.parse()
+    }
+
+    /// Parse volume string (e.g., "1,234,567") to u64
+    fn parse_volume(volume_str: &str) -> Result<u64, std::num::ParseIntError> {
+        let cleaned = volume_str.replace(',', "");
+        cleaned.parse()
+    }
+
+    /// Parse percentage string (e.g., "2.5%", "-1.25%") to float
+    fn parse_percentage(pct_str: &str) -> Result<f64, std::num::ParseFloatError> {
+        let cleaned = pct_str.replace('%', "");
+        cleaned.parse()
     }
 
     /// Get top performing tickers by percentage change
