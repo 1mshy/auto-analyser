@@ -23,7 +23,7 @@ pub struct TickerInfo {
     pub industry: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StockFilter {
     pub min_market_cap: Option<f64>,
     pub max_market_cap: Option<f64>,

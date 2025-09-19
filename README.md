@@ -1,6 +1,98 @@
 # Auto Stock Analyser
 
-A Rust-based stock market analysis tool that fetches real-time and historical data using Yahoo Finance API and calculates technical indicators with advanced customizable filtering.
+A comprehensive stock market analysis tool with a Rust backend for high-performance data processing and a modern React frontend for real-time visualization. Fetches data from Yahoo Finance API and calculates technical indicators with advanced customizable filtering.
+
+## 🚀 New React Frontend Dashboard
+
+**Experience real-time stock analysis with our beautiful web interface!**
+
+- 📊 **Live Dashboard**: Watch analysis progress in real-time
+- 🎯 **Interactive Filters**: Customize analysis criteria with instant feedback
+- 📈 **Visual Charts**: RSI distribution and market trend visualization  
+- 🔍 **Smart Filtering**: Sort and filter results by opportunities, RSI, volume, and more
+- 📱 **Responsive Design**: Works perfectly on desktop, tablet, and mobile
+
+### Quick Start with Web Interface
+
+```bash
+# Start both backend API and React frontend
+./start-dev.sh
+```
+
+Then open your browser to:
+- **Dashboard**: http://localhost:3000
+- **API**: http://127.0.0.1:3001
+
+## Installation & Setup
+
+### Prerequisites
+
+- **Rust** (latest stable version): [Install Rust](https://rustup.rs/)
+- **Node.js** 16+ and npm: [Install Node.js](https://nodejs.org/)
+- **Git**: For cloning the repository
+
+### Quick Setup
+
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd auto-analyser
+
+# Start the full application (backend + frontend)
+./start-dev.sh
+```
+
+The startup script will:
+1. Build and start the Rust backend API on port 3001
+2. Install frontend dependencies (if needed)
+3. Start the React development server on port 3000
+4. Open the dashboard at http://localhost:3000
+
+### Manual Setup
+
+If you prefer to run components separately:
+
+#### Backend Only
+```bash
+# Run the command-line analyzer
+cargo run
+
+# Or start the web API server
+cargo run --bin server
+```
+
+#### Frontend Only
+```bash
+cd frontend
+npm install
+npm start
+```
+
+## Usage Modes
+
+### 🌐 Web Dashboard (Recommended)
+
+The React frontend provides the most intuitive experience:
+
+1. **Configure Analysis**: Use the filter panel to set your criteria
+2. **Start Analysis**: Click "Start Analysis" to begin real-time processing
+3. **Monitor Progress**: Watch live updates as stocks are analyzed
+4. **View Results**: Explore opportunities with interactive tables and charts
+
+Features:
+- Real-time progress tracking
+- Interactive filtering and sorting
+- RSI distribution charts
+- Mobile-responsive design
+- Trading signal alerts
+
+### 💻 Command Line Interface
+
+For traditional terminal-based usage:
+
+- **Basic Analysis**: Just run `cargo run` to fetch and analyze today's top stocks.
+- **Custom Scripts**: Use provided examples or create your own in the `src/bin` directory.
+- **Ticker Collection**: Explore thousands of tickers with `cargo run --example ticker_collection`.
 
 ## Features
 
