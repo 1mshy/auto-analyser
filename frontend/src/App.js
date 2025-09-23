@@ -10,23 +10,23 @@ function App() {
   const [sessionId, setSessionId] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [filter, setFilter] = useState({
-    min_market_cap: null,
-    max_market_cap: null,
+    min_market_cap: 100000000, // $100M minimum market cap (broader range)
+    max_market_cap: 100000000000, // $100B maximum market cap
     min_price: 1,
-    max_price: 1000,
+    max_price: 500,
     min_volume: null,
     max_volume: null,
     min_pct_change: null,
     max_pct_change: null,
     min_rsi: null,
-    max_rsi: null,
+    max_rsi: 40, // Look for stocks with RSI below 40 (low RSI)
     sectors: null,
     countries: null,
     industries: null,
     min_ipo_year: null,
     max_ipo_year: null,
-    oversold_rsi_threshold: 30,
-    overbought_rsi_threshold: 70,
+    oversold_rsi_threshold: 30, // Broader threshold for opportunities  
+    overbought_rsi_threshold: 40, // Upper limit for low RSI
     max_tickers: null,
     max_analysis: null
   });

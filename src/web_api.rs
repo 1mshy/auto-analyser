@@ -109,9 +109,9 @@ struct TickerQuery {
 }
 
 async fn get_tickers(Query(params): Query<TickerQuery>) -> Result<Json<Vec<TickerInfo>>, StatusCode> {
-    let limit = params.limit.unwrap_or(0); // 0 means fetch all
+    let _limit = params.limit.unwrap_or(0); // 0 means fetch all - but we'll fetch all anyway
     
-    match StockAnalyzer::fetch_n_tickers(limit).await {
+    match StockAnalyzer::fetch_all_tickers().await {
         Ok(tickers) => Ok(Json(tickers)),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
@@ -227,7 +227,7 @@ async fn run_analysis(state: AppState, session_id: String, request: AnalysisRequ
     };
     
     // Fetch tickers
-    let all_tickers = match StockAnalyzer::fetch_n_tickers(request.max_tickers.unwrap_or(0)).await {
+    let all_tickers = match StockAnalyzer::fetch_all_tickers().await {
         Ok(tickers) => tickers,
         Err(e) => {
             current_status.status = "error".to_string();
@@ -315,8 +315,8 @@ async fn run_analysis(state: AppState, session_id: String, request: AnalysisRequ
             let _ = state.broadcast_tx.send(current_status.clone());
         }
         
-        // Small delay to prevent rate limiting
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Remove delay to process faster
+        // tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
     
     current_status.status = "completed".to_string();

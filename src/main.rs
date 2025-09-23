@@ -14,8 +14,8 @@ async fn main() -> Result<()> {
     let filter = create_custom_filter();
     print_filter_settings(&filter);
 
-    println!("📡 Fetching available tickers from Nasdaq...");
-    match StockAnalyzer::fetch_n_tickers(500).await {
+    println!("📡 Fetching ALL available tickers from Nasdaq...");
+    match StockAnalyzer::fetch_all_tickers().await {
         Ok(all_tickers) => {
             println!("✅ Fetched {} tickers successfully!", all_tickers.len());
             
@@ -78,11 +78,11 @@ async fn main() -> Result<()> {
                     continue;
                 }
 
-                // Limit analysis to prevent rate limiting
-                if analyzed_count >= 100 {
-                    println!("⏱️  Reached analysis limit to prevent rate limiting");
-                    break;
-                }
+                // Remove analysis limit to check all stocks
+                // if analyzed_count >= 100 {
+                //     println!("⏱️  Reached analysis limit to prevent rate limiting");
+                //     break;
+                // }
             }
 
             println!("\n{}", "=".repeat(70));
@@ -101,17 +101,14 @@ async fn main() -> Result<()> {
 
 fn create_custom_filter() -> StockFilter {
     StockFilter::new()
-        // Market cap range: $1B to $500B (based on available data)
-        .with_market_cap_range(Some(1_000_000_000.0), Some(500_000_000_000.0))
+        // Market cap range: $100M to $100B (broader range for decent market cap)
+        .with_market_cap_range(Some(100_000_000.0), Some(100_000_000_000.0))
         
-        // Price range: $5 to $1000 (reasonable stock prices)
-        .with_price_range(Some(5.0), Some(1000.0))
+        // Price range: $1 to $500 (reasonable stock prices)
+        .with_price_range(Some(1.0), Some(500.0))
         
-        // Percentage change: look for stocks with some movement
-        .with_pct_change_range(Some(-20.0), Some(20.0))
-        
-        // RSI thresholds for identifying oversold conditions
-        .with_rsi_thresholds(Some(30.0), Some(70.0))
+        // Low RSI threshold for oversold conditions (good buying opportunities)
+        .with_rsi_thresholds(Some(30.0), Some(40.0))  // Look for stocks with RSI between 30-40
 }
 
 fn print_filter_settings(filter: &StockFilter) {
@@ -153,24 +150,17 @@ fn print_filter_settings(filter: &StockFilter) {
     println!("{}", "-".repeat(50));
 }
 
-fn is_opportunity(_ticker: &str, rsi: f64, stock_data: &[auto_analyser::StockData], filter: &StockFilter) -> bool {
-    // Check if RSI indicates oversold condition
+fn is_opportunity(_ticker: &str, rsi: f64, _stock_data: &[auto_analyser::StockData], filter: &StockFilter) -> bool {
+    // Check if RSI indicates low/oversold condition (good buying opportunity)
     if let Some(oversold_threshold) = filter.oversold_rsi_threshold {
-        if rsi < oversold_threshold {
+        if rsi <= oversold_threshold {
             return true;
         }
     }
 
-    // Check for recent strong performance (price increase over last week)
-    if stock_data.len() >= 7 {
-        let recent_data = &stock_data[stock_data.len() - 7..];
-        let start_price = recent_data[0].close;
-        let end_price = recent_data[recent_data.len() - 1].close;
-        let week_change = ((end_price - start_price) / start_price) * 100.0;
-        
-        if week_change > 5.0 && rsi < 60.0 {  // Strong recent performance but not overbought
-            return true;
-        }
+    // Additional check: RSI below 40 is a good opportunity
+    if rsi <= 40.0 {
+        return true;
     }
 
     false

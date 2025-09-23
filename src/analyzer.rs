@@ -403,15 +403,10 @@ impl StockAnalyzer {
      * NOTE: count=0 infers max amount (no limit)
      */
     pub async fn fetch_n_tickers(count: usize) -> Result<Vec<TickerInfo>> {
-        let url = if count == 0 {
-            // For unlimited, don't include limit parameter or use a very large number
-            "https://api.nasdaq.com/api/screener/stocks?tableonly=true".to_string()
-        } else {
-            format!(
-                "https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit={}",
-                count
-            )
-        };
+        let url = format!(
+            "https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit={}",
+            if count == 0 { 10000 } else { count }  // Use large number for unlimited
+        );
 
         let client = reqwest::Client::new();
         let response = client
@@ -456,7 +451,7 @@ impl StockAnalyzer {
 
     /// Fetch all available tickers from Nasdaq API
     pub async fn fetch_all_tickers() -> Result<Vec<TickerInfo>> {
-        return StockAnalyzer::fetch_n_tickers(0).await;
+        return StockAnalyzer::fetch_n_tickers(10000).await;  // Use large number instead of 0
     }
 
     /// Filter tickers by comprehensive criteria
