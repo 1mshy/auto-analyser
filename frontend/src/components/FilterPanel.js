@@ -127,6 +127,36 @@ const FilterPanel = ({ filter, onFilterChange, filterStats }) => {
           </div>
         </div>
 
+        {/* Analysis Limits */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-3 block">Analysis Limits</label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Max Tickers to Fetch</label>
+              <input
+                type="number"
+                value={filter.max_tickers || ''}
+                onChange={(e) => handleInputChange('max_tickers', e.target.value === '' ? null : parseInt(e.target.value))}
+                placeholder="All"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Max to Analyze</label>
+              <input
+                type="number"
+                value={filter.max_analysis || ''}
+                onChange={(e) => handleInputChange('max_analysis', e.target.value === '' ? null : parseInt(e.target.value))}
+                placeholder="All"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Leave empty to fetch/analyze all available stocks. Warning: analyzing all stocks may take a very long time.
+          </p>
+        </div>
+
         {/* RSI Thresholds */}
         <div>
           <label className="text-sm font-medium text-gray-700 mb-3 block">RSI Trading Signals</label>
@@ -221,7 +251,9 @@ const FilterPanel = ({ filter, onFilterChange, filterStats }) => {
             min_ipo_year: null,
             max_ipo_year: null,
             oversold_rsi_threshold: 30,
-            overbought_rsi_threshold: 70
+            overbought_rsi_threshold: 70,
+            max_tickers: null,
+            max_analysis: null
           })}
           className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition-colors"
         >

@@ -109,7 +109,7 @@ struct TickerQuery {
 }
 
 async fn get_tickers(Query(params): Query<TickerQuery>) -> Result<Json<Vec<TickerInfo>>, StatusCode> {
-    let limit = params.limit.unwrap_or(100);
+    let limit = params.limit.unwrap_or(0); // 0 means fetch all
     
     match StockAnalyzer::fetch_n_tickers(limit).await {
         Ok(tickers) => Ok(Json(tickers)),
@@ -120,7 +120,7 @@ async fn get_tickers(Query(params): Query<TickerQuery>) -> Result<Json<Vec<Ticke
 async fn get_filter_stats(
     Json(filter): Json<StockFilter>,
 ) -> Result<Json<FilterStats>, StatusCode> {
-    match StockAnalyzer::fetch_n_tickers(1000).await {
+    match StockAnalyzer::fetch_all_tickers().await {
         Ok(all_tickers) => {
             let filtered_tickers = StockAnalyzer::filter_tickers(&all_tickers, &filter);
             
@@ -227,7 +227,7 @@ async fn run_analysis(state: AppState, session_id: String, request: AnalysisRequ
     };
     
     // Fetch tickers
-    let all_tickers = match StockAnalyzer::fetch_n_tickers(request.max_tickers.unwrap_or(500)).await {
+    let all_tickers = match StockAnalyzer::fetch_n_tickers(request.max_tickers.unwrap_or(0)).await {
         Ok(tickers) => tickers,
         Err(e) => {
             current_status.status = "error".to_string();
@@ -240,7 +240,7 @@ async fn run_analysis(state: AppState, session_id: String, request: AnalysisRequ
     
     // Apply filters
     let filtered_tickers = StockAnalyzer::filter_tickers(&all_tickers, &request.filter);
-    let max_analysis = request.max_analysis.unwrap_or(100).min(filtered_tickers.len());
+    let max_analysis = request.max_analysis.unwrap_or(filtered_tickers.len()).min(filtered_tickers.len());
     
     current_status.total_count = max_analysis;
     state.sessions.write().await.insert(session_id.clone(), current_status.clone());

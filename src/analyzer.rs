@@ -400,13 +400,18 @@ impl StockAnalyzer {
     }
     /**
      * Fetches n amount of tickers from the nasdaq api.
-     * NOTE: count=0 infers max amount
+     * NOTE: count=0 infers max amount (no limit)
      */
     pub async fn fetch_n_tickers(count: usize) -> Result<Vec<TickerInfo>> {
-        let url = format!(
-            "https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit={}",
-            count
-        );
+        let url = if count == 0 {
+            // For unlimited, don't include limit parameter or use a very large number
+            "https://api.nasdaq.com/api/screener/stocks?tableonly=true".to_string()
+        } else {
+            format!(
+                "https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit={}",
+                count
+            )
+        };
 
         let client = reqwest::Client::new();
         let response = client
@@ -440,7 +445,12 @@ impl StockAnalyzer {
             });
         }
 
-        println!("📊 Fetched {} tickers from Nasdaq API", tickers.len());
+        let message = if count == 0 { 
+            " (no limit)".to_string() 
+        } else { 
+            format!(" (requested: {})", count) 
+        };
+        println!("📊 Fetched {} tickers from Nasdaq API{}", tickers.len(), message);
         Ok(tickers)
     }
 

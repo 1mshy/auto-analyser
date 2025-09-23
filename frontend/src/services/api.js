@@ -12,8 +12,9 @@ export const healthCheck = async () => {
   return response.data;
 };
 
-export const getTickers = async (limit = 100) => {
-  const response = await api.get('/tickers', { params: { limit } });
+export const getTickers = async (limit = null) => {
+  const params = limit ? { limit } : {};
+  const response = await api.get('/tickers', { params });
   return response.data;
 };
 

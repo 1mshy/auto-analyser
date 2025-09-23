@@ -26,7 +26,9 @@ function App() {
     min_ipo_year: null,
     max_ipo_year: null,
     oversold_rsi_threshold: 30,
-    overbought_rsi_threshold: 70
+    overbought_rsi_threshold: 70,
+    max_tickers: null,
+    max_analysis: null
   });
   const [filterStats, setFilterStats] = useState(null);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -75,8 +77,8 @@ function App() {
       setIsRunning(true);
       const response = await api.startAnalysis({
         filter,
-        max_tickers: 500,
-        max_analysis: 100
+        max_tickers: filter.max_tickers,
+        max_analysis: filter.max_analysis
       });
       setSessionId(response.session_id);
       setAnalysisStatus({
