@@ -51,13 +51,13 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
 
   if (!analysisStatus) {
     return (
-      <Card className="w-full">
+      <Card className="w-full shadow-md">
         <CardBody className="p-8 text-center">
-          <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <Activity className="h-12 w-12 text-default-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">
             Ready to Analyze
           </h3>
-          <p className="text-gray-600">
+          <p className="text-default-600">
             Click &quot;Start Analysis&quot; to begin real-time stock market
             analysis
           </p>
@@ -136,13 +136,13 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   return (
     <div className="space-y-6">
       {/* Header with Controls */}
-      <Card>
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 pt-6">
+      <Card className="shadow-md">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">
+            <h2 className="text-xl font-bold text-foreground">
               Analysis Results
             </h2>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-default-600">
               {sortedResults.length} of {analysisStatus.total_count} stocks
               {isRunning && (
                 <span className="ml-2 inline-flex items-center">
@@ -188,18 +188,20 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           </div>
         </CardHeader>
 
-        <CardBody className="px-6 pb-6">
+        <CardBody className="pt-0">
           {chartData.length > 0 && (
             <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-4">RSI Distribution</h3>
-              <div className="h-64">
+              <h3 className="text-lg font-semibold mb-4 text-foreground">
+                RSI Distribution
+              </h3>
+              <div className="h-64 bg-content1 rounded-lg p-4">
                 <ResponsiveContainer height="100%" width="100%">
                   <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip />
-                    <Bar dataKey="count" fill="#8884d8" />
+                    <Bar dataKey="count" fill="hsl(var(--heroui-primary))" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -207,7 +209,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           )}
 
           {/* Results Table */}
-          <Table aria-label="Stock analysis results">
+          <Table aria-label="Stock analysis results" className="min-h-[200px]">
             <TableHeader>
               <TableColumn>SYMBOL</TableColumn>
               <TableColumn>NAME</TableColumn>
@@ -221,14 +223,21 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
               {sortedResults.map((stock: StockResult, index) => (
                 <TableRow key={`${stock.symbol}-${index}`}>
                   <TableCell>
-                    <div className="font-mono font-bold">{stock.symbol}</div>
+                    <div className="font-mono font-bold text-foreground">
+                      {stock.symbol}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <div className="max-w-xs truncate" title={stock.name}>
+                    <div
+                      className="max-w-xs truncate text-default-700"
+                      title={stock.name}
+                    >
                       {stock.name}
                     </div>
                   </TableCell>
-                  <TableCell>{formatCurrency(stock.current_price)}</TableCell>
+                  <TableCell className="text-foreground">
+                    {formatCurrency(stock.current_price)}
+                  </TableCell>
                   <TableCell>
                     <div
                       className={`flex items-center gap-1 ${
@@ -245,7 +254,9 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                       {stock.pct_change?.toFixed(2) || "0.00"}%
                     </div>
                   </TableCell>
-                  <TableCell>{formatVolume(stock.volume)}</TableCell>
+                  <TableCell className="text-default-700">
+                    {formatVolume(stock.volume)}
+                  </TableCell>
                   <TableCell>
                     {stock.rsi ? (
                       <Chip
@@ -256,7 +267,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                         {stock.rsi.toFixed(1)}
                       </Chip>
                     ) : (
-                      <span className="text-gray-400">N/A</span>
+                      <span className="text-default-400">N/A</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -285,7 +296,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
 
           {sortedResults.length === 0 && !isRunning && (
             <div className="text-center py-8">
-              <p className="text-gray-500">
+              <p className="text-default-500">
                 No results match your current filter criteria.
               </p>
             </div>

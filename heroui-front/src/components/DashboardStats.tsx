@@ -43,14 +43,14 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {/* Analysis Progress */}
-      <Card>
+      <Card className="shadow-md">
         <CardBody className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">
+              <p className="text-sm font-medium text-default-600">
                 Analysis Progress
               </p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-2xl font-bold text-foreground">
                 {analysisStatus
                   ? `${analysisStatus.analyzed_count}/${analysisStatus.total_count}`
                   : "0/0"}
@@ -58,19 +58,19 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
             </div>
             <div
               className={`p-3 rounded-full ${
-                isRunning ? "bg-primary-100" : "bg-gray-100"
+                isRunning ? "bg-primary-100" : "bg-default-100"
               }`}
             >
               <Activity
                 className={`h-6 w-6 ${
-                  isRunning ? "text-primary" : "text-gray-600"
+                  isRunning ? "text-primary" : "text-default-600"
                 }`}
               />
             </div>
           </div>
           {analysisStatus && (
             <div className="mt-4">
-              <div className="flex justify-between text-sm text-gray-600 mb-2">
+              <div className="flex justify-between text-sm text-default-600 mb-2">
                 <span>Progress</span>
                 <span>{(analysisStatus.progress * 100).toFixed(1)}%</span>
               </div>
@@ -85,11 +85,11 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
       </Card>
 
       {/* Opportunities Found */}
-      <Card>
+      <Card className="shadow-md">
         <CardBody className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">
+              <p className="text-sm font-medium text-default-600">
                 Opportunities Found
               </p>
               <p className="text-2xl font-bold text-success">
@@ -101,7 +101,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
             </div>
           </div>
           <div className="mt-4">
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-default-600">
               Success Rate:{" "}
               <span className="font-medium text-success">
                 {getOpportunityRate()}%
@@ -112,11 +112,11 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
       </Card>
 
       {/* Filtered Tickers */}
-      <Card>
+      <Card className="shadow-md">
         <CardBody className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">
+              <p className="text-sm font-medium text-default-600">
                 Filtered Tickers
               </p>
               <p className="text-2xl font-bold text-secondary">
@@ -128,7 +128,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
             </div>
           </div>
           <div className="mt-4">
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-default-600">
               From {formatNumber(filterStats?.total_tickers)} total
             </span>
           </div>
@@ -136,11 +136,11 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
       </Card>
 
       {/* Status */}
-      <Card>
+      <Card className="shadow-md">
         <CardBody className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Status</p>
+              <p className="text-sm font-medium text-default-600">Status</p>
               <div className="flex items-center gap-2 mt-1">
                 <Chip
                   color={getStatusColor(analysisStatus?.status)}
@@ -159,7 +159,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
                     ? "bg-primary-100"
                     : analysisStatus?.status === "error"
                       ? "bg-danger-100"
-                      : "bg-gray-100"
+                      : "bg-default-100"
               }`}
             >
               <Clock
@@ -170,7 +170,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
                       ? "text-primary"
                       : analysisStatus?.status === "error"
                         ? "text-danger"
-                        : "text-gray-600"
+                        : "text-default-600"
                 }`}
               />
             </div>

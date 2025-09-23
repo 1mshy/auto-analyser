@@ -55,14 +55,16 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
   return (
     <Card className="w-full">
-      <CardHeader className="flex items-center gap-2 px-6 pt-6">
-        <Filter className="h-5 w-5 text-primary" />
-        <h3 className="text-lg font-semibold">Analysis Filters</h3>
+      <CardHeader className="flex items-center gap-3 pb-3">
+        <div className="flex items-center gap-2">
+          <Filter className="h-5 w-5 text-primary" />
+          <h3 className="text-lg font-semibold">Analysis Filters</h3>
+        </div>
       </CardHeader>
-      <CardBody className="px-6 pb-6">
+      <CardBody className="pt-0">
         {/* Filter Stats Summary */}
         {filterStats && (
-          <div className="mb-6 p-4 bg-primary-50 rounded-lg">
+          <div className="mb-6 p-4 bg-primary-50 rounded-lg border border-primary-100">
             <p className="text-sm text-primary-700 font-medium">
               {formatNumber(filterStats.filtered_tickers)} of{" "}
               {formatNumber(filterStats.total_tickers)} stocks match your
