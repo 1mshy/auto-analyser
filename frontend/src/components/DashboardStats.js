@@ -1,7 +1,7 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, DollarSign, BarChart3, Activity, Wifi } from 'lucide-react';
 
-const DashboardStats = ({ continuousStatus, filterStats, filteredResultsCount, isConnected }) => {
+const DashboardStats = ({ continuousStatus, filterStats, filteredResultsCount, isConnected, lastResultsUpdate }) => {
   const formatNumber = (num) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
@@ -17,6 +17,11 @@ const DashboardStats = ({ continuousStatus, filterStats, filteredResultsCount, i
     if (!continuousStatus?.last_update) return 'Never';
     const date = new Date(continuousStatus.last_update);
     return date.toLocaleTimeString();
+  };
+
+  const formatResultsUpdate = () => {
+    if (!lastResultsUpdate) return 'Never';
+    return lastResultsUpdate.toLocaleTimeString();
   };
 
   return (
@@ -90,6 +95,9 @@ const DashboardStats = ({ continuousStatus, filterStats, filteredResultsCount, i
           <span className="text-sm text-gray-600">
             From {formatNumber(filterStats?.total_tickers)} total
           </span>
+          <div className="text-xs text-gray-500 mt-1">
+            Last updated: {formatResultsUpdate()}
+          </div>
         </div>
       </div>
 

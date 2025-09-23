@@ -2,9 +2,14 @@ import React, { useState } from 'react';
 import { TrendingUp, TrendingDown, AlertTriangle, DollarSign, Activity, BarChart3, Clock, Wifi, WifiOff } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
-const AnalysisResults = ({ results, continuousStatus, isConnected }) => {
+const AnalysisResults = ({ results, continuousStatus, isConnected, lastResultsUpdate }) => {
   const [sortBy, setSortBy] = useState('rsi');
   const [filterType, setFilterType] = useState('all'); // all, opportunities, oversold, overbought
+
+  const formatResultsUpdate = () => {
+    if (!lastResultsUpdate) return 'Never';
+    return lastResultsUpdate.toLocaleTimeString();
+  };
 
   if (!results || results.length === 0) {
     return (
@@ -121,6 +126,9 @@ const AnalysisResults = ({ results, continuousStatus, isConnected }) => {
             <h2 className="text-xl font-bold text-gray-900">Analysis Results</h2>
             <p className="text-gray-600">
               {continuousStatus?.is_running ? 'Continuous analysis running...' : 'Analysis data from server'}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Last updated: {formatResultsUpdate()} • Auto-refresh every 10s
             </p>
           </div>
           

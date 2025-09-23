@@ -9,6 +9,8 @@ function App() {
   const [continuousStatus, setContinuousStatus] = useState(null);
   const [filteredResults, setFilteredResults] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [lastResultsUpdate, setLastResultsUpdate] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [filter, setFilter] = useState({
     min_market_cap: 100000000, // $100M minimum market cap (broader range)
     max_market_cap: 100000000000, // $100B maximum market cap
@@ -61,7 +63,7 @@ function App() {
     };
   }, []);
 
-  // Fetch initial continuous status
+  // Fetch initial continuous status and then periodically
   useEffect(() => {
     const fetchContinuousStatus = async () => {
       try {
@@ -72,7 +74,14 @@ function App() {
       }
     };
     
+    // Fetch immediately
     fetchContinuousStatus();
+    
+    // Set up interval to fetch every 10 seconds
+    const interval = setInterval(fetchContinuousStatus, 10000);
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch filter stats when filter changes
@@ -89,18 +98,29 @@ function App() {
     fetchStats();
   }, [filter]);
 
-  // Fetch filtered results when filter changes
+  // Fetch filtered results when filter changes and then every 10 seconds
   useEffect(() => {
     const fetchFilteredResults = async () => {
       try {
+        setIsRefreshing(true);
         const results = await api.getFilteredResults(filter);
         setFilteredResults(results);
+        setLastResultsUpdate(new Date());
       } catch (error) {
         console.error('Failed to fetch filtered results:', error);
+      } finally {
+        setIsRefreshing(false);
       }
     };
     
+    // Fetch immediately when filter changes
     fetchFilteredResults();
+    
+    // Set up interval to fetch every 10 seconds
+    const interval = setInterval(fetchFilteredResults, 10000);
+    
+    // Cleanup interval on unmount or filter change
+    return () => clearInterval(interval);
   }, [filter]);
 
   return (
@@ -122,8 +142,10 @@ function App() {
               <div className="flex items-center space-x-2">
                 {isConnected ? (
                   <>
-                    <Wifi className="h-5 w-5 text-green-300" />
-                    <span className="text-sm text-green-300">Live</span>
+                    <Wifi className={`h-5 w-5 text-green-300 ${isRefreshing ? 'animate-pulse' : ''}`} />
+                    <span className="text-sm text-green-300">
+                      {isRefreshing ? 'Refreshing...' : 'Live'}
+                    </span>
                   </>
                 ) : (
                   <>
@@ -166,6 +188,7 @@ function App() {
               filterStats={filterStats}
               filteredResultsCount={filteredResults.length}
               isConnected={isConnected}
+              lastResultsUpdate={lastResultsUpdate}
             />
             
             {/* Analysis Results */}
@@ -174,6 +197,7 @@ function App() {
                 results={filteredResults}
                 continuousStatus={continuousStatus}
                 isConnected={isConnected}
+                lastResultsUpdate={lastResultsUpdate}
               />
             </div>
           </div>

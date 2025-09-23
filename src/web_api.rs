@@ -525,7 +525,7 @@ async fn run_continuous_analysis(state: AppState) {
         let mut new_results = Vec::new();
         let mut opportunities_found = 0;
         
-        // Analyze each ticker
+        // Analyze each ticker and update results immediately
         for (i, ticker_info) in all_tickers.iter().enumerate() {
             let ticker = &ticker_info.symbol;
             
@@ -572,9 +572,19 @@ async fn run_continuous_analysis(state: AppState) {
                                 timestamp: chrono::Utc::now(),
                             };
                             
-                            new_results.push(result);
+                            // Add to local results
+                            new_results.push(result.clone());
                             if is_opportunity {
                                 opportunities_found += 1;
+                            }
+                            
+                            // Immediately update global results with this stock
+                            {
+                                let mut all_results = state.all_results.write().await;
+                                // Remove any existing result for this ticker
+                                all_results.retain(|r| r.ticker != *ticker);
+                                // Add the new result
+                                all_results.push(result);
                             }
                         }
                     }
@@ -584,16 +594,16 @@ async fn run_continuous_analysis(state: AppState) {
                 }
             }
             
-            // Update progress every 10 stocks
-            if (i + 1) % 10 == 0 || i + 1 == all_tickers.len() {
+            // Update progress every 5 stocks for more frequent updates
+            if (i + 1) % 5 == 0 || i + 1 == all_tickers.len() {
                 let mut status = state.continuous_analysis_status.write().await;
                 status.analyzed_count = i + 1;
                 status.progress = (i + 1) as f64 / all_tickers.len() as f64;
                 status.opportunities_found = opportunities_found;
                 status.last_update = chrono::Utc::now();
                 
-                // Broadcast update every 50 stocks
-                if (i + 1) % 50 == 0 || i + 1 == all_tickers.len() {
+                // Broadcast update every 10 stocks for more frequent updates
+                if (i + 1) % 10 == 0 || i + 1 == all_tickers.len() {
                     let _ = state.broadcast_tx.send(AnalysisStatus {
                         session_id: "continuous".to_string(),
                         status: "running".to_string(),
@@ -609,12 +619,6 @@ async fn run_continuous_analysis(state: AppState) {
             
             // Small delay to avoid overwhelming the API
             tokio::time::sleep(Duration::from_millis(50)).await;
-        }
-        
-        // Update the global results
-        {
-            let mut all_results = state.all_results.write().await;
-            *all_results = new_results;
         }
         
         // Mark cycle as complete
