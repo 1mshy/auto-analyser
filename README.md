@@ -1,27 +1,40 @@
 # Auto Stock Analyser
 
-A comprehensive stock market analysis tool with a Rust backend for high-performance data processing and a modern React frontend for real-time visualization. Fetches data from Yahoo Finance API and calculates technical indicators with advanced customizable filtering.
+A comprehensive 24/7 stock market analysis tool with a Rust backend for high-performance continuous data processing and a modern React frontend for real-time visualization. Features continuous stock analysis, WebSocket real-time updates, and advanced filtering capabilities.
 
-## 🚀 New React Frontend Dashboard
+## 🔄 New Continuous Analysis Feature
+
+**The server now runs 24/7, continuously analyzing all stocks!**
+
+- ⚡ **24/7 Operation**: Server continuously scans and analyzes all available stocks
+- 🔄 **Automatic Cycles**: Completes full market analysis every hour
+- 🌐 **Multiple Frontends**: Multiple clients can connect and view live progress
+- 📡 **WebSocket Updates**: Real-time progress updates via WebSocket connections
+- 🎯 **Live Filtering**: Apply filters to view subsets of continuously updated results
+- 📊 **Persistent Results**: Analysis results are stored and filtered server-side
+
+## 🚀 React Frontend Dashboard
 
 **Experience real-time stock analysis with our beautiful web interface!**
 
-- 📊 **Live Dashboard**: Watch analysis progress in real-time
-- 🎯 **Interactive Filters**: Customize analysis criteria with instant feedback
+- 📊 **Live Dashboard**: Watch continuous analysis progress in real-time
+- 🔗 **Connection Status**: Visual indicators for WebSocket connection status
+- 🎯 **Interactive Filters**: Filter results from continuous analysis instantly
 - 📈 **Visual Charts**: RSI distribution and market trend visualization  
-- 🔍 **Smart Filtering**: Sort and filter results by opportunities, RSI, volume, and more
+- 🔍 **Smart Filtering**: Sort and filter by opportunities, RSI, volume, and more
 - 📱 **Responsive Design**: Works perfectly on desktop, tablet, and mobile
+- ⏱️ **Cycle Tracking**: Monitor analysis cycles and completion rates
 
-### Quick Start with Web Interface
+### Quick Start with Continuous Analysis
 
 ```bash
-# Start both backend API and React frontend
-./start-dev.sh
+# Start the continuous analysis server and frontend
+./start-continuous.sh
 ```
 
 Then open your browser to:
-- **Dashboard**: http://localhost:3000
-- **API**: http://127.0.0.1:3001
+- **Dashboard**: http://localhost:3000 (React frontend)
+- **API**: http://127.0.0.1:3001 (Rust backend with WebSocket support)
 
 ## Installation & Setup
 
@@ -38,15 +51,20 @@ Then open your browser to:
 git clone <your-repo-url>
 cd auto-analyser
 
-# Start the full application (backend + frontend)
+# Start continuous analysis (recommended)
+./start-continuous.sh
+
+# Alternative: Legacy mode with manual analysis
 ./start-dev.sh
 ```
 
-The startup script will:
-1. Build and start the Rust backend API on port 3001
-2. Install frontend dependencies (if needed)
-3. Start the React development server on port 3000
-4. Open the dashboard at http://localhost:3000
+### How Continuous Analysis Works
+
+1. **Server Startup**: The Rust backend immediately begins analyzing all available stocks
+2. **Analysis Cycles**: Every hour, the server completes a full analysis of all stocks
+3. **Real-time Updates**: WebSocket connections broadcast progress to all connected frontends
+4. **Filtering**: Frontend clients can apply filters to view subsets of the continuously updated results
+5. **Persistence**: Results are stored server-side and updated with each analysis cycle
 
 ### Manual Setup
 

@@ -1,15 +1,17 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Query, State, WebSocketUpgrade},
+    extract::ws::{Message, WebSocket},
     http::StatusCode,
     response::Json,
     routing::{get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, RwLock};
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
+use futures::{sink::SinkExt, stream::StreamExt};
 
 use crate::{StockAnalyzer, StockFilter, TickerInfo};
 
@@ -64,6 +66,35 @@ pub struct FilterStats {
 pub struct AppState {
     pub sessions: Arc<RwLock<HashMap<String, AnalysisStatus>>>,
     pub broadcast_tx: broadcast::Sender<AnalysisStatus>,
+    pub all_results: Arc<RwLock<Vec<StockAnalysisResult>>>,
+    pub continuous_analysis_status: Arc<RwLock<ContinuousAnalysisStatus>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContinuousAnalysisStatus {
+    pub is_running: bool,
+    pub current_cycle: usize,
+    pub progress: f64,
+    pub analyzed_count: usize,
+    pub total_count: usize,
+    pub opportunities_found: usize,
+    pub last_update: chrono::DateTime<chrono::Utc>,
+    pub error_message: Option<String>,
+}
+
+impl Default for ContinuousAnalysisStatus {
+    fn default() -> Self {
+        Self {
+            is_running: false,
+            current_cycle: 0,
+            progress: 0.0,
+            analyzed_count: 0,
+            total_count: 0,
+            opportunities_found: 0,
+            last_update: chrono::Utc::now(),
+            error_message: None,
+        }
+    }
 }
 
 impl AppState {
@@ -72,12 +103,24 @@ impl AppState {
         Self {
             sessions: Arc::new(RwLock::new(HashMap::new())),
             broadcast_tx,
+            all_results: Arc::new(RwLock::new(Vec::new())),
+            continuous_analysis_status: Arc::new(RwLock::new(ContinuousAnalysisStatus::default())),
         }
+    }
+    
+    pub async fn start_continuous_analysis(&self) {
+        let state = self.clone();
+        tokio::spawn(async move {
+            run_continuous_analysis(state).await;
+        });
     }
 }
 
 pub async fn create_router() -> Router {
     let state = AppState::new();
+    
+    // Start continuous analysis
+    state.start_continuous_analysis().await;
 
     Router::new()
         .route("/api/health", get(health_check))
@@ -86,6 +129,9 @@ pub async fn create_router() -> Router {
         .route("/api/analysis", post(start_analysis))
         .route("/api/analysis/:session_id", get(get_analysis_status))
         .route("/api/analysis/:session_id/results", get(get_analysis_results))
+        .route("/api/continuous-status", get(get_continuous_status))
+        .route("/api/filtered-results", post(get_filtered_results))
+        .route("/ws", get(websocket_handler))
         .with_state(state)
         .layer(
             CorsLayer::new()
@@ -93,6 +139,60 @@ pub async fn create_router() -> Router {
                 .allow_methods(Any)
                 .allow_headers(Any),
         )
+}
+
+async fn get_continuous_status(
+    State(state): State<AppState>,
+) -> Result<Json<ContinuousAnalysisStatus>, StatusCode> {
+    let status = state.continuous_analysis_status.read().await;
+    Ok(Json(status.clone()))
+}
+
+async fn get_filtered_results(
+    State(state): State<AppState>,
+    Json(filter): Json<StockFilter>,
+) -> Result<Json<Vec<StockAnalysisResult>>, StatusCode> {
+    let all_results = state.all_results.read().await;
+    let filtered_results = filter_results(&all_results, &filter);
+    Ok(Json(filtered_results))
+}
+
+async fn websocket_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+) -> axum::response::Response {
+    ws.on_upgrade(|socket| handle_websocket(socket, state))
+}
+
+async fn handle_websocket(socket: WebSocket, state: AppState) {
+    let (mut sender, mut receiver) = socket.split();
+    let mut broadcast_rx = state.broadcast_tx.subscribe();
+    
+    // Send current status immediately
+    let status = state.continuous_analysis_status.read().await.clone();
+    let msg = serde_json::to_string(&status).unwrap_or_default();
+    if sender.send(Message::Text(msg)).await.is_err() {
+        return;
+    }
+    
+    // Handle incoming messages and broadcast updates
+    tokio::select! {
+        _ = async {
+            while let Some(msg) = receiver.next().await {
+                if msg.is_err() {
+                    break;
+                }
+            }
+        } => {},
+        _ = async {
+            while let Ok(status) = broadcast_rx.recv().await {
+                let msg = serde_json::to_string(&status).unwrap_or_default();
+                if sender.send(Message::Text(msg)).await.is_err() {
+                    break;
+                }
+            }
+        } => {}
+    }
 }
 
 async fn health_check() -> Json<serde_json::Value> {
@@ -323,6 +423,214 @@ async fn run_analysis(state: AppState, session_id: String, request: AnalysisRequ
     current_status.progress = 1.0;
     state.sessions.write().await.insert(session_id.clone(), current_status.clone());
     let _ = state.broadcast_tx.send(current_status);
+}
+
+fn filter_results(results: &[StockAnalysisResult], filter: &StockFilter) -> Vec<StockAnalysisResult> {
+    results.iter()
+        .filter(|result| {
+            // Apply RSI filter
+            if let Some(min_rsi) = filter.min_rsi {
+                if result.rsi.map_or(true, |rsi| rsi < min_rsi) {
+                    return false;
+                }
+            }
+            if let Some(max_rsi) = filter.max_rsi {
+                if result.rsi.map_or(true, |rsi| rsi > max_rsi) {
+                    return false;
+                }
+            }
+            
+            // Apply price filter
+            if let Some(min_price) = filter.min_price {
+                if result.current_price.map_or(true, |price| price < min_price) {
+                    return false;
+                }
+            }
+            if let Some(max_price) = filter.max_price {
+                if result.current_price.map_or(true, |price| price > max_price) {
+                    return false;
+                }
+            }
+            
+            // Apply volume filter
+            if let Some(min_volume) = filter.min_volume {
+                if result.volume.map_or(true, |vol| vol < min_volume) {
+                    return false;
+                }
+            }
+            if let Some(max_volume) = filter.max_volume {
+                if result.volume.map_or(true, |vol| vol > max_volume) {
+                    return false;
+                }
+            }
+            
+            // Apply percentage change filter
+            if let Some(min_pct_change) = filter.min_pct_change {
+                if result.pct_change.map_or(true, |pct| pct < min_pct_change) {
+                    return false;
+                }
+            }
+            if let Some(max_pct_change) = filter.max_pct_change {
+                if result.pct_change.map_or(true, |pct| pct > max_pct_change) {
+                    return false;
+                }
+            }
+            
+            true
+        })
+        .cloned()
+        .collect()
+}
+
+async fn run_continuous_analysis(state: AppState) {
+    println!("🔄 Starting continuous stock analysis...");
+    
+    let mut cycle = 0;
+    loop {
+        cycle += 1;
+        
+        // Update status to running
+        {
+            let mut status = state.continuous_analysis_status.write().await;
+            status.is_running = true;
+            status.current_cycle = cycle;
+            status.progress = 0.0;
+            status.analyzed_count = 0;
+            status.last_update = chrono::Utc::now();
+            status.error_message = None;
+        }
+        
+        let mut analyzer = StockAnalyzer::new();
+        
+        // Fetch all tickers
+        let all_tickers = match StockAnalyzer::fetch_all_tickers().await {
+            Ok(tickers) => tickers,
+            Err(e) => {
+                let mut status = state.continuous_analysis_status.write().await;
+                status.error_message = Some(format!("Failed to fetch tickers: {}", e));
+                status.is_running = false;
+                println!("❌ Failed to fetch tickers: {}", e);
+                
+                // Wait 5 minutes before retrying
+                tokio::time::sleep(Duration::from_secs(300)).await;
+                continue;
+            }
+        };
+        
+        {
+            let mut status = state.continuous_analysis_status.write().await;
+            status.total_count = all_tickers.len();
+        }
+        
+        let mut new_results = Vec::new();
+        let mut opportunities_found = 0;
+        
+        // Analyze each ticker
+        for (i, ticker_info) in all_tickers.iter().enumerate() {
+            let ticker = &ticker_info.symbol;
+            
+            match analyzer.fetch_all_stock_data(ticker).await {
+                Ok(stock_data) => {
+                    if !stock_data.is_empty() {
+                        let indicators = analyzer.calculate_indicators(ticker, &stock_data);
+                        
+                        if let Some(latest_indicator) = indicators.last() {
+                            let current_price = stock_data.last().map(|quote| quote.close);
+                            let is_opportunity = latest_indicator.rsi.map_or(false, |rsi| {
+                                rsi <= 30.0 || rsi >= 70.0
+                            });
+                            
+                            let mut signals = Vec::new();
+                            if let Some(rsi) = latest_indicator.rsi {
+                                if rsi <= 30.0 {
+                                    signals.push("Oversold - Potential Buy".to_string());
+                                } else if rsi >= 70.0 {
+                                    signals.push("Overbought - Potential Sell".to_string());
+                                }
+                            }
+                            
+                            let (macd_value, macd_signal_value, macd_histogram_value) = 
+                                latest_indicator.macd.unwrap_or((0.0, 0.0, 0.0));
+                            
+                            let result = StockAnalysisResult {
+                                ticker: ticker.clone(),
+                                name: ticker_info.name.clone(),
+                                current_price,
+                                rsi: latest_indicator.rsi,
+                                sma_20: latest_indicator.sma_20,
+                                sma_50: latest_indicator.sma_50,
+                                macd: if latest_indicator.macd.is_some() { Some(macd_value) } else { None },
+                                macd_signal: if latest_indicator.macd.is_some() { Some(macd_signal_value) } else { None },
+                                macd_histogram: if latest_indicator.macd.is_some() { Some(macd_histogram_value) } else { None },
+                                volume: stock_data.last().map(|q| q.volume),
+                                pct_change: ticker_info.pct_change.as_ref().and_then(|s| {
+                                    s.replace('%', "").parse().ok()
+                                }),
+                                market_cap: ticker_info.market_cap.clone(),
+                                is_opportunity,
+                                signals,
+                                timestamp: chrono::Utc::now(),
+                            };
+                            
+                            new_results.push(result);
+                            if is_opportunity {
+                                opportunities_found += 1;
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("Failed to analyze {}: {}", ticker, e);
+                }
+            }
+            
+            // Update progress every 10 stocks
+            if (i + 1) % 10 == 0 || i + 1 == all_tickers.len() {
+                let mut status = state.continuous_analysis_status.write().await;
+                status.analyzed_count = i + 1;
+                status.progress = (i + 1) as f64 / all_tickers.len() as f64;
+                status.opportunities_found = opportunities_found;
+                status.last_update = chrono::Utc::now();
+                
+                // Broadcast update every 50 stocks
+                if (i + 1) % 50 == 0 || i + 1 == all_tickers.len() {
+                    let _ = state.broadcast_tx.send(AnalysisStatus {
+                        session_id: "continuous".to_string(),
+                        status: "running".to_string(),
+                        progress: status.progress,
+                        analyzed_count: status.analyzed_count,
+                        total_count: status.total_count,
+                        opportunities_found: status.opportunities_found,
+                        error_message: None,
+                        results: new_results.clone(),
+                    });
+                }
+            }
+            
+            // Small delay to avoid overwhelming the API
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        
+        // Update the global results
+        {
+            let mut all_results = state.all_results.write().await;
+            *all_results = new_results;
+        }
+        
+        // Mark cycle as complete
+        {
+            let mut status = state.continuous_analysis_status.write().await;
+            status.is_running = false;
+            status.progress = 1.0;
+            status.last_update = chrono::Utc::now();
+            
+            println!("✅ Completed analysis cycle {} - {} opportunities found", cycle, opportunities_found);
+        }
+        
+        // Wait 1 hour before next cycle
+        println!("⏱️  Waiting 1 hour before next analysis cycle...");
+        tokio::time::sleep(Duration::from_secs(3600)).await;
+    }
 }
 
 pub async fn start_server() -> Result<(), Box<dyn std::error::Error>> {

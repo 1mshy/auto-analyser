@@ -1,22 +1,43 @@
 import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, AlertTriangle, DollarSign, Activity, BarChart3, Clock } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, DollarSign, Activity, BarChart3, Clock, Wifi, WifiOff } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
-const AnalysisResults = ({ analysisStatus, isRunning }) => {
+const AnalysisResults = ({ results, continuousStatus, isConnected }) => {
   const [sortBy, setSortBy] = useState('rsi');
   const [filterType, setFilterType] = useState('all'); // all, opportunities, oversold, overbought
 
-  if (!analysisStatus) {
+  if (!results || results.length === 0) {
     return (
       <div className="bg-white rounded-xl p-8 card-shadow text-center">
-        <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Ready to Analyze</h3>
-        <p className="text-gray-600">Click "Start Analysis" to begin real-time stock market analysis</p>
+        <div className="flex items-center justify-center mb-4">
+          {isConnected ? (
+            <Wifi className="h-12 w-12 text-blue-400" />
+          ) : (
+            <WifiOff className="h-12 w-12 text-red-400" />
+          )}
+        </div>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">
+          {isConnected ? 'Waiting for Analysis Data' : 'Connection Lost'}
+        </h3>
+        <p className="text-gray-600">
+          {isConnected 
+            ? 'The server is continuously analyzing stocks. Results will appear here.'
+            : 'Reconnecting to the analysis server...'
+          }
+        </p>
+        {continuousStatus && (
+          <div className="mt-4 text-sm text-gray-500">
+            {continuousStatus.is_running 
+              ? `Currently analyzing: ${continuousStatus.analyzed_count}/${continuousStatus.total_count}`
+              : `Last analysis completed: ${continuousStatus.analyzed_count} stocks analyzed`
+            }
+          </div>
+        )}
       </div>
     );
   }
 
-  const filteredResults = analysisStatus.results?.filter(stock => {
+  const filteredResults = results.filter(stock => {
     switch (filterType) {
       case 'opportunities':
         return stock.is_opportunity;
@@ -27,7 +48,7 @@ const AnalysisResults = ({ analysisStatus, isRunning }) => {
       default:
         return true;
     }
-  }) || [];
+  });
 
   const sortedResults = [...filteredResults].sort((a, b) => {
     switch (sortBy) {
@@ -76,7 +97,7 @@ const AnalysisResults = ({ analysisStatus, isRunning }) => {
   };
 
   // Prepare chart data
-  const rsiDistribution = analysisStatus.results?.reduce((acc, stock) => {
+  const rsiDistribution = results.reduce((acc, stock) => {
     if (stock.rsi) {
       const bucket = Math.floor(stock.rsi / 10) * 10;
       acc[bucket] = (acc[bucket] || 0) + 1;
@@ -99,7 +120,7 @@ const AnalysisResults = ({ analysisStatus, isRunning }) => {
           <div>
             <h2 className="text-xl font-bold text-gray-900">Analysis Results</h2>
             <p className="text-gray-600">
-              {isRunning ? 'Analysis in progress...' : 'Analysis completed'}
+              {continuousStatus?.is_running ? 'Continuous analysis running...' : 'Analysis data from server'}
             </p>
           </div>
           
@@ -157,7 +178,7 @@ const AnalysisResults = ({ analysisStatus, isRunning }) => {
           <div className="p-8 text-center">
             <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">
-              {isRunning ? 'Analyzing stocks...' : 'No results match your current filters'}
+              {continuousStatus?.is_running ? 'Analyzing stocks...' : 'No results match your current filters'}
             </p>
           </div>
         ) : (
@@ -256,14 +277,14 @@ const AnalysisResults = ({ analysisStatus, isRunning }) => {
       </div>
 
       {/* Loading state for running analysis */}
-      {isRunning && (
+      {continuousStatus?.is_running && (
         <div className="bg-white rounded-xl p-6 card-shadow">
           <div className="flex items-center justify-center space-x-4">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <div>
-              <p className="text-sm font-medium text-gray-900">Analysis in Progress</p>
+              <p className="text-sm font-medium text-gray-900">Continuous Analysis Running</p>
               <p className="text-sm text-gray-600">
-                {analysisStatus.analyzed_count > 0 && `Processing ${analysisStatus.analyzed_count}/${analysisStatus.total_count} stocks...`}
+                {continuousStatus.analyzed_count > 0 && `Processing ${continuousStatus.analyzed_count}/${continuousStatus.total_count} stocks (Cycle ${continuousStatus.current_cycle})`}
               </p>
             </div>
           </div>
