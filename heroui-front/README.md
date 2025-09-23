@@ -1,43 +1,57 @@
-# Vite & HeroUI Template
+# Auto Stock Analyser - HeroUI Frontend
 
-This is a template for creating applications using Vite and HeroUI (v2).
+This is the migrated frontend for the Auto Stock Analyser application, built with HeroUI components and Tailwind CSS.
 
-[Try it on CodeSandbox](https://githubbox.com/heroui-inc/vite-template)
+## Features
 
-## Technologies Used
+- **Real-time Analysis Dashboard**: Monitor stock analysis progress with live updates
+- **Advanced Filtering**: Comprehensive filter options for market cap, price, volume, RSI, and more
+- **Interactive Results**: Sortable and filterable analysis results with visual indicators
+- **Responsive Design**: Mobile-friendly interface using HeroUI components
+- **Chart Visualization**: RSI distribution charts using Recharts
 
-- [Vite](https://vitejs.dev/guide/)
-- [HeroUI](https://heroui.com)
-- [Tailwind CSS](https://tailwindcss.com)
-- [Tailwind Variants](https://tailwind-variants.org)
-- [TypeScript](https://www.typescriptlang.org)
-- [Framer Motion](https://www.framer.com/motion)
+## Technology Stack
 
-## How to Use
+- **React 18** with TypeScript
+- **HeroUI** - Modern React UI library
+- **Tailwind CSS** - Utility-first CSS framework
+- **Vite** - Fast build tool and dev server
+- **Recharts** - Charts and data visualization
+- **Lucide React** - Beautiful icons
+- **Axios** - HTTP client for API communication
 
-To clone the project, run the following command:
-
-```bash
-git clone https://github.com/heroui-inc/vite-template.git
-```
-
-### Install dependencies
-
-You can use one of them `npm`, `yarn`, `pnpm`, `bun`, Example using `npm`:
+## Development
 
 ```bash
+# Install dependencies
 npm install
-```
 
-### Run the development server
-
-```bash
+# Start development server
 npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
 ```
 
-### Setup pnpm (optional)
+## Components
 
-If you are using `pnpm`, you need to add the following code to your `.npmrc` file:
+### Core Components
+
+- `DashboardStats.tsx` - Statistics cards showing analysis progress, opportunities found, etc.
+- `FilterPanel.tsx` - Comprehensive filtering interface with various stock criteria  
+- `AnalysisResults.tsx` - Interactive table showing analysis results with charts
+
+### Services
+
+- `api.ts` - API service layer with TypeScript interfaces for backend communication
+- `formatters.ts` - Utility functions for number, currency, and data formatting
+
+## Configuration
+
+The app expects the backend API to be running on port 3001. You can modify the API base URL in `src/services/api.ts`.
 
 ```bash
 public-hoist-pattern[]=*@heroui/*
