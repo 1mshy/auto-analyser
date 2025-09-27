@@ -1,6 +1,35 @@
-# Auto Stock Analyser
+# 🚀 Auto Stock Analyser
 
-A comprehensive 24/7 stock market analysis tool with a Rust backend for high-performance continuous data processing and a modern React frontend for real-time visualization. Features continuous stock analysis, WebSocket real-time updates, and advanced filtering capabilities.
+A high-performance, production-ready stock market analysis platform combining a **Rust backend** with **React frontend**. Features 24/7 continuous analysis, real-time WebSocket updates, intelligent caching, and persistent data storage.
+
+## ✨ Key Features
+
+### 🔥 **Performance & Reliability**
+- **High-Speed Analysis**: Rust-powered backend for maximum performance
+- **Intelligent Caching**: Multi-layer caching with Moka for sub-second response times
+- **Database Persistence**: SQLite storage with automatic migrations
+- **Rate Limiting**: Built-in API rate limiting to prevent throttling
+- **Error Resilience**: Comprehensive error handling and recovery
+
+### 📊 **Advanced Analytics**
+- **Technical Indicators**: RSI, SMA (20/50), MACD with real-time calculation
+- **Smart Filtering**: Advanced filters by market cap, price, volume, RSI, sectors
+- **Opportunity Detection**: Automated identification of oversold/overbought stocks
+- **Historical Analysis**: Full historical data processing and trend analysis
+
+### 🌐 **Modern Frontend**
+- **React Query**: Optimized data fetching with automatic caching and retries
+- **Real-time Updates**: WebSocket connections for live data streaming
+- **Error Boundaries**: Graceful error handling and recovery
+- **Responsive Design**: Mobile-first design with Tailwind CSS
+- **Interactive Charts**: RSI distribution and trend visualization
+
+### 🏗️ **Production Ready**
+- **Docker Support**: Complete containerization for easy deployment
+- **Structured Logging**: Comprehensive tracing with configurable log levels
+- **Health Checks**: Built-in health monitoring and status endpoints
+- **Load Balancing**: Nginx configuration for production deployments
+- **Monitoring**: System stats, cache metrics, and database analytics
 
 ## 🔄 New Continuous Analysis Feature
 
@@ -13,28 +42,33 @@ A comprehensive 24/7 stock market analysis tool with a Rust backend for high-per
 - 🎯 **Live Filtering**: Apply filters to view subsets of continuously updated results
 - 📊 **Persistent Results**: Analysis results are stored and filtered server-side
 
-## 🚀 React Frontend Dashboard
+## 🚀 Quick Start
 
-**Experience real-time stock analysis with our beautiful web interface!**
+### 🐳 **Docker Deployment (Recommended)**
 
-- 📊 **Live Dashboard**: Watch continuous analysis progress in real-time
-- 🔗 **Connection Status**: Visual indicators for WebSocket connection status
-- 🎯 **Interactive Filters**: Filter results from continuous analysis instantly
-- 📈 **Visual Charts**: RSI distribution and market trend visualization  
-- 🔍 **Smart Filtering**: Sort and filter by opportunities, RSI, volume, and more
-- 📱 **Responsive Design**: Works perfectly on desktop, tablet, and mobile
-- ⏱️ **Cycle Tracking**: Monitor analysis cycles and completion rates
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/auto-analyser.git
+cd auto-analyser
 
-### Quick Start with Continuous Analysis
+# Start with Docker Compose
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+```
+
+### 🛠️ **Local Development**
 
 ```bash
 # Start the continuous analysis server and frontend
 ./start-continuous.sh
 ```
 
-Then open your browser to:
-- **Dashboard**: http://localhost:3000 (React frontend)
-- **API**: http://127.0.0.1:3001 (Rust backend with WebSocket support)
+**Access Points:**
+- 🌐 **Dashboard**: <http://localhost:3000> (React frontend)
+- 🔌 **API**: <http://127.0.0.1:3001> (Rust backend with WebSocket support)
+- 📊 **Health Check**: <http://127.0.0.1:3001/api/health>
 
 ## Installation & Setup
 

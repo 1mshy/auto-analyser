@@ -36,3 +36,14 @@ tower-http = { version = "0.5", features = ["cors"] }
 uuid = { version = "1.0", features = ["v4"] }
 futures = "0.3"
 tokio-stream = "0.1"
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+moka = { version = "0.12", features = ["future"] }
+thiserror = "1.0"
+dashmap = "5.5"
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockito = "1.4"
+tempfile = "3.8"

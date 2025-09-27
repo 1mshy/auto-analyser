@@ -188,6 +188,7 @@ pub struct TechnicalIndicators {
 pub struct StockAnalyzer {
     provider: yahoo::YahooConnector,
     indicators: HashMap<String, IndicatorSet>,
+    cache: Option<crate::cache::CacheManager>,
 }
 
 struct IndicatorSet {
@@ -202,6 +203,15 @@ impl StockAnalyzer {
         Self {
             provider: yahoo::YahooConnector::new().unwrap(),
             indicators: HashMap::new(),
+            cache: None,
+        }
+    }
+
+    pub fn new_with_cache(cache: crate::cache::CacheManager) -> Self {
+        Self {
+            provider: yahoo::YahooConnector::new().unwrap(),
+            indicators: HashMap::new(),
+            cache: Some(cache),
         }
     }
     /**
@@ -211,6 +221,38 @@ impl StockAnalyzer {
         return self
             .fetch_stock_data(symbol, DateTime::<Utc>::UNIX_EPOCH, Utc::now())
             .await;
+    }
+
+    /**
+     * Fetches stock data with caching support
+     */
+    pub async fn fetch_stock_data_cached(&self, symbol: &str) -> Result<Vec<StockData>> {
+        let cache_key = format!("stock_data_{}", symbol);
+
+        // Check cache first
+        if let Some(ref cache) = self.cache {
+            if let Some(cached_data) = cache.get_stock_data(&cache_key).await {
+                tracing::debug!("Using cached stock data for {}", symbol);
+                return Ok(cached_data);
+            }
+        }
+
+        // Rate limiting check
+        if let Some(ref cache) = self.cache {
+            if cache.should_rate_limit(symbol, std::time::Duration::from_millis(200)) {
+                return Err(anyhow::anyhow!("Rate limited for symbol: {}", symbol));
+            }
+        }
+
+        // Fetch from API
+        let stock_data = self.fetch_all_stock_data(symbol).await?;
+
+        // Cache the result
+        if let Some(ref cache) = self.cache {
+            cache.cache_stock_data(cache_key, stock_data.clone()).await;
+        }
+
+        Ok(stock_data)
     }
 
     /// Fetch historical stock data for a given symbol
@@ -312,6 +354,33 @@ impl StockAnalyzer {
         }
 
         results
+    }
+
+    /// Calculate indicators with caching support
+    pub async fn calculate_indicators_cached(
+        &mut self,
+        symbol: &str,
+        stock_data: &[StockData],
+    ) -> Vec<TechnicalIndicators> {
+        let cache_key = format!("indicators_{}_{}", symbol, stock_data.len());
+
+        // Check cache first
+        if let Some(ref cache) = self.cache {
+            if let Some(cached_indicators) = cache.get_indicators(&cache_key).await {
+                tracing::debug!("Using cached indicators for {}", symbol);
+                return cached_indicators;
+            }
+        }
+
+        // Calculate indicators
+        let indicators = self.calculate_indicators(symbol, stock_data);
+
+        // Cache the result
+        if let Some(ref cache) = self.cache {
+            cache.cache_indicators(cache_key, indicators.clone()).await;
+        }
+
+        indicators
     }
 
     /// Analyze stock with basic signals
@@ -445,13 +514,46 @@ impl StockAnalyzer {
         } else { 
             format!(" (requested: {})", count) 
         };
-        println!("📊 Fetched {} tickers from Nasdaq API{}", tickers.len(), message);
+        tracing::info!("📊 Fetched {} tickers from Nasdaq API{}", tickers.len(), message);
         Ok(tickers)
     }
 
     /// Fetch all available tickers from Nasdaq API
     pub async fn fetch_all_tickers() -> Result<Vec<TickerInfo>> {
         return StockAnalyzer::fetch_n_tickers(10000).await;  // Use large number instead of 0
+    }
+
+    /// Fetch all tickers with caching support
+    pub async fn fetch_all_tickers_cached(&self) -> Result<Vec<TickerInfo>> {
+        let cache_key = "all_tickers";
+        
+        // Check cache first
+        if let Some(ref cache) = self.cache {
+            if let Some(cached_tickers) = cache.get_tickers(cache_key).await {
+                tracing::debug!("Using cached tickers ({} entries)", cached_tickers.len());
+                return Ok(cached_tickers);
+            }
+        }
+
+        // Rate limiting check to prevent excessive API calls
+        if let Some(ref cache) = self.cache {
+            if cache.should_rate_limit("nasdaq_api_tickers", std::time::Duration::from_secs(10)) {
+                tracing::warn!("Rate limiting Nasdaq API ticker fetch - too many requests");
+                return Err(anyhow::anyhow!("Rate limited: ticker fetch"));
+            }
+        }
+
+        tracing::info!("Cache miss - fetching tickers from Nasdaq API");
+
+        // Fetch from API
+        let tickers = Self::fetch_n_tickers(10000).await?;
+
+        // Cache the result
+        if let Some(ref cache) = self.cache {
+            cache.cache_tickers(cache_key.to_string(), tickers.clone()).await;
+        }
+
+        Ok(tickers)
     }
 
     /// Filter tickers by comprehensive criteria
@@ -626,7 +728,7 @@ impl StockAnalyzer {
     }
 
     /// Parse market cap string (e.g., "$1.5B", "$500M") to float
-    fn parse_market_cap(market_cap_str: &str) -> Result<f64, std::num::ParseFloatError> {
+    pub fn parse_market_cap(market_cap_str: &str) -> Result<f64, std::num::ParseFloatError> {
         let cleaned = market_cap_str.replace('$', "").replace(',', "");
 
         if cleaned.ends_with('B') {
@@ -659,7 +761,7 @@ impl StockAnalyzer {
     }
 
     /// Parse percentage string (e.g., "2.5%", "-1.25%") to float
-    fn parse_percentage(pct_str: &str) -> Result<f64, std::num::ParseFloatError> {
+    pub fn parse_percentage(pct_str: &str) -> Result<f64, std::num::ParseFloatError> {
         let cleaned = pct_str.replace('%', "");
         cleaned.parse()
     }

@@ -14,6 +14,8 @@ use uuid::Uuid;
 use futures::{sink::SinkExt, stream::StreamExt};
 
 use crate::{StockAnalyzer, StockFilter, TickerInfo};
+use crate::cache::CacheManager;
+use crate::database::Database;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalysisRequest {
@@ -68,6 +70,8 @@ pub struct AppState {
     pub broadcast_tx: broadcast::Sender<AnalysisStatus>,
     pub all_results: Arc<RwLock<Vec<StockAnalysisResult>>>,
     pub continuous_analysis_status: Arc<RwLock<ContinuousAnalysisStatus>>,
+    pub cache: CacheManager,
+    pub database: Option<Arc<Database>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,13 +102,34 @@ impl Default for ContinuousAnalysisStatus {
 }
 
 impl AppState {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let (broadcast_tx, _) = broadcast::channel(100);
+        let cache = CacheManager::new();
+        
+        // Try to initialize database, but continue without it if it fails
+        let database = match Database::new("sqlite:analysis.db").await {
+            Ok(db) => {
+                if let Err(e) = db.initialize_tables().await {
+                    tracing::warn!("Failed to initialize database tables: {}", e);
+                    None
+                } else {
+                    tracing::info!("Database initialized successfully");
+                    Some(Arc::new(db))
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to connect to database: {}", e);
+                None
+            }
+        };
+        
         Self {
             sessions: Arc::new(RwLock::new(HashMap::new())),
             broadcast_tx,
             all_results: Arc::new(RwLock::new(Vec::new())),
             continuous_analysis_status: Arc::new(RwLock::new(ContinuousAnalysisStatus::default())),
+            cache,
+            database,
         }
     }
     
@@ -117,7 +142,7 @@ impl AppState {
 }
 
 pub async fn create_router() -> Router {
-    let state = AppState::new();
+    let state = AppState::new().await;
     
     // Start continuous analysis
     state.start_continuous_analysis().await;
@@ -131,6 +156,9 @@ pub async fn create_router() -> Router {
         .route("/api/analysis/:session_id/results", get(get_analysis_results))
         .route("/api/continuous-status", get(get_continuous_status))
         .route("/api/filtered-results", post(get_filtered_results))
+        .route("/api/cache-stats", get(get_cache_stats))
+        .route("/api/database-stats", get(get_database_stats))
+        .route("/api/clear-cache", post(clear_cache))
         .route("/ws", get(websocket_handler))
         .with_state(state)
         .layer(
@@ -152,9 +180,59 @@ async fn get_filtered_results(
     State(state): State<AppState>,
     Json(filter): Json<StockFilter>,
 ) -> Result<Json<Vec<StockAnalysisResult>>, StatusCode> {
+    // Try to get from database first if available
+    if let Some(ref db) = state.database {
+        match db.get_latest_results(None).await {
+            Ok(db_results) => {
+                let filtered_results = filter_results(&db_results, &filter);
+                return Ok(Json(filtered_results));
+            }
+            Err(e) => {
+                tracing::warn!("Failed to get results from database: {}", e);
+            }
+        }
+    }
+    
+    // Fallback to in-memory results
     let all_results = state.all_results.read().await;
     let filtered_results = filter_results(&all_results, &filter);
     Ok(Json(filtered_results))
+}
+
+async fn get_cache_stats(
+    State(state): State<AppState>,
+) -> Result<Json<crate::cache::CacheStats>, StatusCode> {
+    let stats = state.cache.get_cache_stats().await;
+    Ok(Json(stats))
+}
+
+async fn get_database_stats(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    if let Some(ref db) = state.database {
+        match db.get_analysis_stats().await {
+            Ok(stats) => Ok(Json(serde_json::to_value(stats).unwrap())),
+            Err(e) => {
+                tracing::error!("Failed to get database stats: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    } else {
+        Ok(Json(serde_json::json!({
+            "error": "Database not available"
+        })))
+    }
+}
+
+async fn clear_cache(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    state.cache.clear_cache().await;
+    tracing::info!("Cache cleared via API request");
+    Ok(Json(serde_json::json!({
+        "status": "success",
+        "message": "Cache cleared successfully"
+    })))
 }
 
 async fn websocket_handler(
@@ -165,34 +243,76 @@ async fn websocket_handler(
 }
 
 async fn handle_websocket(socket: WebSocket, state: AppState) {
+    tracing::info!("🔌 New WebSocket connection established");
     let (mut sender, mut receiver) = socket.split();
     let mut broadcast_rx = state.broadcast_tx.subscribe();
     
     // Send current status immediately
     let status = state.continuous_analysis_status.read().await.clone();
     let msg = serde_json::to_string(&status).unwrap_or_default();
-    if sender.send(Message::Text(msg)).await.is_err() {
+    if let Err(e) = sender.send(Message::Text(msg)).await {
+        tracing::warn!("Failed to send initial status: {}", e);
         return;
     }
     
+    tracing::info!("📡 WebSocket ready to receive broadcasts");
+    
     // Handle incoming messages and broadcast updates
-    tokio::select! {
-        _ = async {
-            while let Some(msg) = receiver.next().await {
-                if msg.is_err() {
-                    break;
+    loop {
+        tokio::select! {
+            // Handle incoming messages from client (mostly pings/pongs)
+            msg = receiver.next() => {
+                match msg {
+                    Some(Ok(Message::Text(text))) => {
+                        tracing::debug!("Received WebSocket message: {}", text);
+                        // Echo back or handle client messages if needed
+                    },
+                    Some(Ok(Message::Binary(_))) => {
+                        tracing::debug!("Received binary message (ignored)");
+                    },
+                    Some(Ok(Message::Ping(data))) => {
+                        if let Err(e) = sender.send(Message::Pong(data)).await {
+                            tracing::warn!("Failed to send pong: {}", e);
+                            break;
+                        }
+                    },
+                    Some(Ok(Message::Pong(_))) => {
+                        tracing::debug!("Received pong");
+                    },
+                    Some(Ok(Message::Close(_))) => {
+                        tracing::info!("🔌 WebSocket client initiated close");
+                        break;
+                    },
+                    Some(Err(e)) => {
+                        tracing::warn!("WebSocket receive error: {}", e);
+                        break;
+                    },
+                    None => {
+                        tracing::info!("🔌 WebSocket receiver stream ended");
+                        break;
+                    }
+                }
+            },
+            // Handle broadcast updates from server
+            status = broadcast_rx.recv() => {
+                match status {
+                    Ok(status_update) => {
+                        let msg = serde_json::to_string(&status_update).unwrap_or_default();
+                        if let Err(e) = sender.send(Message::Text(msg)).await {
+                            tracing::warn!("Failed to send broadcast: {}", e);
+                            break;
+                        }
+                    },
+                    Err(e) => {
+                        tracing::debug!("Broadcast channel error (normal on shutdown): {}", e);
+                        break;
+                    }
                 }
             }
-        } => {},
-        _ = async {
-            while let Ok(status) = broadcast_rx.recv().await {
-                let msg = serde_json::to_string(&status).unwrap_or_default();
-                if sender.send(Message::Text(msg)).await.is_err() {
-                    break;
-                }
-            }
-        } => {}
+        }
     }
+    
+    tracing::info!("🔌 WebSocket connection closed");
 }
 
 async fn health_check() -> Json<serde_json::Value> {
@@ -208,19 +328,22 @@ struct TickerQuery {
     limit: Option<usize>,
 }
 
-async fn get_tickers(Query(params): Query<TickerQuery>) -> Result<Json<Vec<TickerInfo>>, StatusCode> {
+async fn get_tickers(State(state): State<AppState>, Query(params): Query<TickerQuery>) -> Result<Json<Vec<TickerInfo>>, StatusCode> {
     let _limit = params.limit.unwrap_or(0); // 0 means fetch all - but we'll fetch all anyway
     
-    match StockAnalyzer::fetch_all_tickers().await {
+    let analyzer = StockAnalyzer::new_with_cache(state.cache.clone());
+    match analyzer.fetch_all_tickers_cached().await {
         Ok(tickers) => Ok(Json(tickers)),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
 async fn get_filter_stats(
+    State(state): State<AppState>,
     Json(filter): Json<StockFilter>,
 ) -> Result<Json<FilterStats>, StatusCode> {
-    match StockAnalyzer::fetch_all_tickers().await {
+    let analyzer = StockAnalyzer::new_with_cache(state.cache.clone());
+    match analyzer.fetch_all_tickers_cached().await {
         Ok(all_tickers) => {
             let filtered_tickers = StockAnalyzer::filter_tickers(&all_tickers, &filter);
             
@@ -318,7 +441,7 @@ async fn get_analysis_results(
 }
 
 async fn run_analysis(state: AppState, session_id: String, request: AnalysisRequest) {
-    let mut analyzer = StockAnalyzer::new();
+    let mut analyzer = StockAnalyzer::new_with_cache(state.cache.clone());
     
     // Update status to show we're starting
     let mut current_status = {
@@ -326,8 +449,8 @@ async fn run_analysis(state: AppState, session_id: String, request: AnalysisRequ
         sessions.get(&session_id).unwrap().clone()
     };
     
-    // Fetch tickers
-    let all_tickers = match StockAnalyzer::fetch_all_tickers().await {
+    // Fetch tickers with caching
+    let all_tickers = match analyzer.fetch_all_tickers_cached().await {
         Ok(tickers) => tickers,
         Err(e) => {
             current_status.status = "error".to_string();
@@ -350,10 +473,10 @@ async fn run_analysis(state: AppState, session_id: String, request: AnalysisRequ
     for (i, ticker_info) in filtered_tickers.iter().take(max_analysis).enumerate() {
         let ticker = &ticker_info.symbol;
         
-        match analyzer.fetch_all_stock_data(ticker).await {
+        match analyzer.fetch_stock_data_cached(ticker).await {
             Ok(stock_data) => {
                 if !stock_data.is_empty() {
-                    let indicators = analyzer.calculate_indicators(ticker, &stock_data);
+                    let indicators = analyzer.calculate_indicators_cached(ticker, &stock_data).await;
                     
                     if let Some(latest_indicator) = indicators.last() {
                         let current_price = stock_data.last().map(|quote| quote.close);
@@ -394,15 +517,22 @@ async fn run_analysis(state: AppState, session_id: String, request: AnalysisRequ
                             timestamp: chrono::Utc::now(),
                         };
                         
-                        current_status.results.push(result);
+                        current_status.results.push(result.clone());
                         if is_opportunity {
                             current_status.opportunities_found += 1;
+                        }
+
+                        // Store in database if available
+                        if let Some(ref db) = state.database {
+                            if let Err(e) = db.store_analysis_result(&result, &session_id).await {
+                                tracing::warn!("Failed to store result in database: {}", e);
+                            }
                         }
                     }
                 }
             }
             Err(e) => {
-                println!("Failed to analyze {}: {}", ticker, e);
+                tracing::warn!("Failed to analyze {}: {}", ticker, e);
             }
         }
         
@@ -483,7 +613,7 @@ fn filter_results(results: &[StockAnalysisResult], filter: &StockFilter) -> Vec<
 }
 
 async fn run_continuous_analysis(state: AppState) {
-    println!("🔄 Starting continuous stock analysis...");
+    tracing::info!("🔄 Starting continuous stock analysis...");
     
     let mut cycle = 0;
     loop {
@@ -500,16 +630,16 @@ async fn run_continuous_analysis(state: AppState) {
             status.error_message = None;
         }
         
-        let mut analyzer = StockAnalyzer::new();
+        let mut analyzer = StockAnalyzer::new_with_cache(state.cache.clone());
         
-        // Fetch all tickers
-        let all_tickers = match StockAnalyzer::fetch_all_tickers().await {
+        // Fetch all tickers with caching
+        let all_tickers = match analyzer.fetch_all_tickers_cached().await {
             Ok(tickers) => tickers,
             Err(e) => {
                 let mut status = state.continuous_analysis_status.write().await;
                 status.error_message = Some(format!("Failed to fetch tickers: {}", e));
                 status.is_running = false;
-                println!("❌ Failed to fetch tickers: {}", e);
+                tracing::error!("❌ Failed to fetch tickers: {}", e);
                 
                 // Wait 5 minutes before retrying
                 tokio::time::sleep(Duration::from_secs(300)).await;
@@ -526,13 +656,15 @@ async fn run_continuous_analysis(state: AppState) {
         let mut opportunities_found = 0;
         
         // Analyze each ticker and update results immediately
+        let session_id = format!("continuous_cycle_{}", cycle);
+        
         for (i, ticker_info) in all_tickers.iter().enumerate() {
             let ticker = &ticker_info.symbol;
             
-            match analyzer.fetch_all_stock_data(ticker).await {
+            match analyzer.fetch_stock_data_cached(ticker).await {
                 Ok(stock_data) => {
                     if !stock_data.is_empty() {
-                        let indicators = analyzer.calculate_indicators(ticker, &stock_data);
+                        let indicators = analyzer.calculate_indicators_cached(ticker, &stock_data).await;
                         
                         if let Some(latest_indicator) = indicators.last() {
                             let current_price = stock_data.last().map(|quote| quote.close);
@@ -578,6 +710,13 @@ async fn run_continuous_analysis(state: AppState) {
                                 opportunities_found += 1;
                             }
                             
+                            // Store in database if available
+                            if let Some(ref db) = state.database {
+                                if let Err(e) = db.store_analysis_result(&result, &session_id).await {
+                                    tracing::warn!("Failed to store result in database: {}", e);
+                                }
+                            }
+                            
                             // Immediately update global results with this stock
                             {
                                 let mut all_results = state.all_results.write().await;
@@ -590,7 +729,7 @@ async fn run_continuous_analysis(state: AppState) {
                     }
                 }
                 Err(e) => {
-                    println!("Failed to analyze {}: {}", ticker, e);
+                    tracing::warn!("Failed to analyze {}: {}", ticker, e);
                 }
             }
             
@@ -628,11 +767,11 @@ async fn run_continuous_analysis(state: AppState) {
             status.progress = 1.0;
             status.last_update = chrono::Utc::now();
             
-            println!("✅ Completed analysis cycle {} - {} opportunities found", cycle, opportunities_found);
+            tracing::info!("✅ Completed analysis cycle {} - {} opportunities found", cycle, opportunities_found);
         }
         
         // Wait 1 hour before next cycle
-        println!("⏱️  Waiting 1 hour before next analysis cycle...");
+        tracing::info!("⏱️  Waiting 1 hour before next analysis cycle...");
         tokio::time::sleep(Duration::from_secs(3600)).await;
     }
 }

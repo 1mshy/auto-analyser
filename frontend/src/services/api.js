@@ -52,7 +52,12 @@ export const getFilteredResults = async (filter) => {
 
 // WebSocket connection for real-time updates
 export const connectWebSocket = (onMessage, onError = null) => {
+  console.log('🔌 Connecting to WebSocket:', WS_BASE_URL);
   const ws = new WebSocket(WS_BASE_URL);
+  
+  ws.onopen = () => {
+    console.log('✅ WebSocket connected');
+  };
   
   ws.onmessage = (event) => {
     try {
@@ -64,13 +69,33 @@ export const connectWebSocket = (onMessage, onError = null) => {
   };
   
   ws.onerror = (error) => {
-    console.error('WebSocket error:', error);
+    console.error('❌ WebSocket error:', error);
     if (onError) onError(error);
   };
   
-  ws.onclose = () => {
-    console.log('WebSocket connection closed');
+  ws.onclose = (event) => {
+    console.log('🔌 WebSocket connection closed', {
+      code: event.code,
+      reason: event.reason,
+      wasClean: event.wasClean
+    });
   };
   
   return ws;
+};
+
+// Additional API functions for new endpoints
+export const getCacheStats = async () => {
+  const response = await api.get('/cache-stats');
+  return response.data;
+};
+
+export const getDatabaseStats = async () => {
+  const response = await api.get('/database-stats');
+  return response.data;
+};
+
+export const clearCache = async () => {
+  const response = await api.post('/clear-cache');
+  return response.data;
 };
